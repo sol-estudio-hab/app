@@ -1,0 +1,41 @@
+{
+  "packageId": "com.solestudiohab.pagos",
+  "host": "pagos.solestudiohab.com",
+  "name": "Sol Estudio Hab — Pagos",
+  "launcherName": "Sol Estudio",
+  "display": "standalone",
+  "themeColor": "#0f766e",
+  "themeColorDark": "#000000",
+  "navigationColor": "#0f766e",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://pagos.solestudiohab.com/icons/icon-512.png",
+  "maskableIconUrl": "https://pagos.solestudiohab.com/icons/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "solestudiohab"
+  },
+  "appVersionCode": 1,
+  "appVersion": "1",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://pagos.solestudiohab.com/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "minSdkVersion": 21,
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}

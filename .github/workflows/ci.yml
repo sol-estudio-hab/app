@@ -1,0 +1,32 @@
+name: CI
+
+# Listo para cuando el proyecto se conecte a un repositorio de GitHub
+# (Fase 1 lo dejó pendiente porque todavía no había repo). No requiere
+# secretos para correr: lint, tests unitarios y build no tocan la red.
+# Las pruebas de seguridad y E2E (npm run test:seguridad / test:e2e)
+# necesitan credenciales de cuentas de prueba reales y quedan fuera de
+# este workflow — se documentan en el README para correrlas a mano o en
+# un job aparte con secretos configurados.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:coverage
+      - run: npm audit --audit-level=high
+      - run: npm run build

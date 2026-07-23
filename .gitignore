@@ -1,0 +1,52 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Variables de entorno (credenciales) — nunca subir
+.env
+.env.*
+!.env.example
+
+# Service worker generado por vite-plugin-pwa en dev
+dev-dist
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.vercel
+.env*
+
+# Android TWA (Bubblewrap): nunca subir la clave de firma ni los builds
+android-twa/android.keystore
+android-twa/*.keystore
+android-twa/.gradle
+android-twa/build
+android-twa/app/build
+android-twa/*.apk
+android-twa/*.aab
+
+# Artefactos generados (regenerables con los comandos del proyecto)
+coverage
+test-results
+supabase/.temp
+
+# Config local del agente/IDE
+.claude
