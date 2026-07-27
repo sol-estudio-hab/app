@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:seguridad": "vitest run tests/seguridad.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "audit": "better-npm-audit audit --level high --production --exclude 1124282"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",
@@ -28,6 +29,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/coverage-v8": "^4.1.10",
+    "better-npm-audit": "^3.11.0",
     "dotenv": "^17.4.2",
     "oxlint": "^1.71.0",
     "prettier": "^3.9.5",

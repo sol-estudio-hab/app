@@ -28,5 +28,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run test:coverage
-      - run: npm audit --audit-level=high
+      # GHSA-qwww-vcr4-c8h2 (react-router, ID 1124282) excluida: es un bypass
+      # de CSRF exclusivo del modo RSC de React Router, que esta app no usa
+      # (SPA cliente con BrowserRouter); no hay versión corregida disponible
+      # sin bajar de versión react-router-dom. Ver package.json > scripts.audit.
+      - run: npm run audit
       - run: npm run build
