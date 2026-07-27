@@ -1,7 +1,14 @@
 /// <reference lib="webworker" />
+import { clientsClaim } from 'workbox-core'
 import { precacheAndRoute } from 'workbox-precaching'
 
 declare const self: ServiceWorkerGlobalScope
+
+// Sin esto, un service worker nuevo se queda "esperando" hasta que el
+// usuario cierre todas las pestañas de la app — puede tardar días en verse
+// un cambio. skipWaiting + clientsClaim lo activan de inmediato.
+self.skipWaiting()
+clientsClaim()
 
 precacheAndRoute(self.__WB_MANIFEST)
 

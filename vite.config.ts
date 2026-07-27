@@ -13,6 +13,10 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
+      // Registramos el service worker a mano en src/registrarSW.ts para
+      // poder revisar actualizaciones periódicamente y recargar sin que
+      // el usuario tenga que hacer Ctrl+F5.
+      injectRegister: false,
       includeAssets: ['favicon.svg'],
       devOptions: {
         enabled: true,
