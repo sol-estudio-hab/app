@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import EstadoPagoBadge from '../components/EstadoPagoBadge'
-import { estadoDelMes, formatearMes, generarMesesAcuerdo } from '../lib/calendario'
+import { estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from '../lib/calendario'
 import { getSupabase } from '../lib/supabase'
-import type { Acuerdo, Huesped, Pago } from '../types/dominio'
+import type { Acuerdo, Deposito, Huesped, Pago } from '../types/dominio'
 
 export default function DetalleHuespedAdmin() {
   const { id } = useParams<{ id: string }>()
   const [huesped, setHuesped] = useState<Huesped | null>(null)
   const [acuerdo, setAcuerdo] = useState<Acuerdo | null>(null)
   const [pagos, setPagos] = useState<Pago[]>([])
+  const [depositos, setDepositos] = useState<Deposito[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -22,6 +23,8 @@ export default function DetalleHuespedAdmin() {
 
   const [rechazandoMes, setRechazandoMes] = useState<string | null>(null)
   const [motivoRechazo, setMotivoRechazo] = useState('')
+  const [rechazandoCargue, setRechazandoCargue] = useState<1 | 2 | null>(null)
+  const [motivoRechazoDeposito, setMotivoRechazoDeposito] = useState('')
 
   async function cargar() {
     if (!id) return
@@ -52,10 +55,15 @@ export default function DetalleHuespedAdmin() {
     if (a) {
       setFechaIngreso(a.fecha_ingreso)
       setMesesAcuerdo(String(a.meses_acuerdo))
-      const pagosRes = await supabase.from('pagos').select('*').eq('acuerdo_id', a.id)
+      const [pagosRes, depositosRes] = await Promise.all([
+        supabase.from('pagos').select('*').eq('acuerdo_id', a.id),
+        supabase.from('depositos').select('*').eq('acuerdo_id', a.id),
+      ])
       setPagos((pagosRes.data as Pago[]) ?? [])
+      setDepositos((depositosRes.data as Deposito[]) ?? [])
     } else {
       setPagos([])
+      setDepositos([])
     }
     setCargando(false)
   }
@@ -151,6 +159,45 @@ export default function DetalleHuespedAdmin() {
     await cargar()
   }
 
+  async function verificarDeposito(deposito: Deposito) {
+    setError(null)
+    const {
+      data: { user },
+    } = await getSupabase().auth.getUser()
+    if (!user) return
+    const { error: errorVerificar } = await getSupabase()
+      .from('depositos')
+      .update({
+        estado: 'verificado',
+        verificado_por: user.id,
+        fecha_verificacion: new Date().toISOString(),
+      })
+      .eq('id', deposito.id)
+    if (errorVerificar) setError('No se pudo verificar el depósito.')
+    await cargar()
+  }
+
+  async function confirmarRechazoDeposito(deposito: Deposito) {
+    setError(null)
+    const {
+      data: { user },
+    } = await getSupabase().auth.getUser()
+    if (!user) return
+    const { error: errorRechazar } = await getSupabase()
+      .from('depositos')
+      .update({
+        estado: 'rechazado',
+        verificado_por: user.id,
+        fecha_verificacion: new Date().toISOString(),
+        observaciones: motivoRechazoDeposito || 'Comprobante rechazado por el administrador.',
+      })
+      .eq('id', deposito.id)
+    if (errorRechazar) setError('No se pudo rechazar el depósito.')
+    setRechazandoCargue(null)
+    setMotivoRechazoDeposito('')
+    await cargar()
+  }
+
   if (cargando) return <p className="mt-8 text-center text-slate-500">Cargando…</p>
   if (!huesped) return <p className="mt-8 text-center text-slate-500">Huésped no encontrado.</p>
 
@@ -219,6 +266,80 @@ export default function DetalleHuespedAdmin() {
           {guardando ? 'Guardando…' : 'Guardar cambios'}
         </button>
       </div>
+
+      {acuerdo && (
+        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+          <h2 className="font-semibold text-slate-900">Depósito de garantía</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {([1, 2] as const).map((numeroCargue) => {
+              const deposito = depositos.find((d) => d.numero_cargue === numeroCargue)
+              const estado = estadoDeposito(deposito?.estado)
+              return (
+                <div
+                  key={numeroCargue}
+                  className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900">Cargue {numeroCargue}</p>
+                    <EstadoPagoBadge estado={estado} />
+                  </div>
+
+                  {deposito?.archivo_url && (
+                    <button
+                      type="button"
+                      onClick={() => verComprobante(deposito.archivo_url!)}
+                      className="w-fit text-sm text-marca-700 underline"
+                    >
+                      Ver comprobante
+                    </button>
+                  )}
+
+                  {deposito?.estado === 'cargado' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => verificarDeposito(deposito)}
+                        className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
+                      >
+                        Verificar
+                      </button>
+                      {rechazandoCargue === numeroCargue ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            value={motivoRechazoDeposito}
+                            onChange={(e) => setMotivoRechazoDeposito(e.target.value)}
+                            placeholder="Motivo del rechazo"
+                            className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => confirmarRechazoDeposito(deposito)}
+                            className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700"
+                          >
+                            Confirmar rechazo
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setRechazandoCargue(numeroCargue)}
+                          className="rounded-lg border border-red-600 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                        >
+                          Rechazar
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {deposito?.estado === 'rechazado' && deposito.observaciones && (
+                    <p className="text-xs text-red-600">Motivo: {deposito.observaciones}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {acuerdo ? (
         <div className="mt-6 flex flex-col gap-3">

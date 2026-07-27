@@ -51,6 +51,14 @@ export function estadoDelMes(vencimiento: Date, pago: Pago | undefined, hoy = ne
   return hoySinHora > vencimientoSinHora ? 'vencido' : 'pendiente'
 }
 
+/** Estado visual de un cargue de depósito (no depende de una fecha de vencimiento). */
+export function estadoDeposito(estado: Pago['estado'] | undefined): EstadoMes {
+  if (estado === 'verificado') return 'verificado'
+  if (estado === 'cargado') return 'en_revision'
+  if (estado === 'rechazado') return 'rechazado'
+  return 'pendiente'
+}
+
 /** Formatea "2026-01" como "Enero 2026". */
 export function formatearMes(mesYYYYMM: string): string {
   const [anio, mes] = mesYYYYMM.split('-').map(Number)

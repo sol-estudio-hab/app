@@ -2,25 +2,29 @@ import { useEffect, useState } from 'react'
 import EstadoPagoBadge from '../components/EstadoPagoBadge'
 import { useAuth } from '../context/AuthContext'
 import { TAMANO_MAXIMO_BYTES, TIPOS_PERMITIDOS, extensionParaMime } from '../lib/archivos'
-import { estadoDelMes, formatearMes, generarMesesAcuerdo } from '../lib/calendario'
+import { estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from '../lib/calendario'
 import { getSupabase } from '../lib/supabase'
-import type { Pago } from '../types/dominio'
+import type { Deposito, Pago } from '../types/dominio'
 
 export default function MisPagos() {
   const { huesped, acuerdoActivo } = useAuth()
   const [pagos, setPagos] = useState<Pago[]>([])
+  const [depositos, setDepositos] = useState<Deposito[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [subiendoMes, setSubiendoMes] = useState<string | null>(null)
+  const [subiendoCargue, setSubiendoCargue] = useState<1 | 2 | null>(null)
 
   async function cargarPagos() {
     if (!acuerdoActivo) return
-    const { data, error: errorConsulta } = await getSupabase()
-      .from('pagos')
-      .select('*')
-      .eq('acuerdo_id', acuerdoActivo.id)
-    if (errorConsulta) setError(errorConsulta.message)
-    else setPagos((data as Pago[]) ?? [])
+    const supabase = getSupabase()
+    const [pagosRes, depositosRes] = await Promise.all([
+      supabase.from('pagos').select('*').eq('acuerdo_id', acuerdoActivo.id),
+      supabase.from('depositos').select('*').eq('acuerdo_id', acuerdoActivo.id),
+    ])
+    if (pagosRes.error) setError(pagosRes.error.message)
+    else setPagos((pagosRes.data as Pago[]) ?? [])
+    setDepositos((depositosRes.data as Deposito[]) ?? [])
     setCargando(false)
   }
 
@@ -46,7 +50,7 @@ export default function MisPagos() {
 
   const meses = generarMesesAcuerdo(acuerdoActivo.fecha_ingreso, acuerdoActivo.meses_acuerdo)
 
-  async function verComprobante(archivoUrl: string) {
+  async function verArchivo(archivoUrl: string) {
     const { data, error: errorFirma } = await getSupabase()
       .storage.from('comprobantes')
       .createSignedUrl(archivoUrl, 60)
@@ -112,6 +116,67 @@ export default function MisPagos() {
     await cargarPagos()
   }
 
+  async function subirDeposito(
+    numeroCargue: 1 | 2,
+    depositoExistente: Deposito | undefined,
+    archivo: File,
+  ) {
+    setError(null)
+    if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
+      setError('Solo se aceptan imágenes (JPG, PNG, WEBP) o PDF.')
+      return
+    }
+    if (archivo.size > TAMANO_MAXIMO_BYTES) {
+      setError('El archivo supera el tamaño máximo de 10 MB.')
+      return
+    }
+    if (
+      depositoExistente?.archivo_url &&
+      !window.confirm(
+        `Ya cargaste un comprobante para el cargue ${numeroCargue} del depósito. ¿Deseas reemplazarlo?`,
+      )
+    ) {
+      return
+    }
+
+    setSubiendoCargue(numeroCargue)
+    const supabase = getSupabase()
+    const extension = extensionParaMime(archivo.type)
+    const ruta = `${huesped!.id}/deposito-${numeroCargue}.${extension}`
+
+    const { error: errorSubida } = await supabase.storage
+      .from('comprobantes')
+      .upload(ruta, archivo, { upsert: true, contentType: archivo.type })
+
+    if (errorSubida) {
+      setError('No se pudo subir el archivo. Intenta de nuevo.')
+      setSubiendoCargue(null)
+      return
+    }
+
+    const datosDeposito = {
+      archivo_url: ruta,
+      estado: 'cargado' as const,
+      fecha_carga: new Date().toISOString(),
+      verificado_por: null,
+      fecha_verificacion: null,
+      observaciones: null,
+    }
+
+    const { error: errorGuardar } = depositoExistente
+      ? await supabase.from('depositos').update(datosDeposito).eq('id', depositoExistente.id)
+      : await supabase.from('depositos').insert({
+          acuerdo_id: acuerdoActivo!.id,
+          numero_cargue: numeroCargue,
+          ...datosDeposito,
+        })
+
+    if (errorGuardar) setError('No se pudo registrar el depósito.')
+
+    setSubiendoCargue(null)
+    await cargarPagos()
+  }
+
   return (
     <section>
       <h1 className="text-xl font-bold text-marca-900">Mis pagos</h1>
@@ -121,6 +186,69 @@ export default function MisPagos() {
       </p>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+        <h2 className="font-semibold text-slate-900">Depósito de garantía</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Comprobante del depósito, independiente de los pagos mensuales. Se puede cargar en hasta
+          2 pagos.
+        </p>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {([1, 2] as const).map((numeroCargue) => {
+            const deposito = depositos.find((d) => d.numero_cargue === numeroCargue)
+            const estado = estadoDeposito(deposito?.estado)
+            return (
+              <div
+                key={numeroCargue}
+                className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">Cargue {numeroCargue}</p>
+                  <EstadoPagoBadge estado={estado} />
+                </div>
+
+                {deposito?.estado === 'rechazado' && deposito.observaciones && (
+                  <p className="text-xs text-red-600">Motivo: {deposito.observaciones}</p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {deposito?.archivo_url && (
+                    <button
+                      type="button"
+                      onClick={() => verArchivo(deposito.archivo_url!)}
+                      className="text-sm text-marca-700 underline"
+                    >
+                      Ver comprobante
+                    </button>
+                  )}
+
+                  {estado !== 'verificado' && (
+                    <label className="cursor-pointer rounded-lg bg-marca-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-800">
+                      {subiendoCargue === numeroCargue
+                        ? 'Subiendo…'
+                        : deposito?.archivo_url
+                          ? 'Reemplazar'
+                          : 'Subir comprobante'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
+                        className="hidden"
+                        disabled={subiendoCargue !== null}
+                        onChange={(evento) => {
+                          const archivo = evento.target.files?.[0]
+                          evento.target.value = ''
+                          if (archivo) subirDeposito(numeroCargue, deposito, archivo)
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       <div className="mt-6 flex flex-col gap-3">
         {meses.map(({ mes, vencimiento }) => {
@@ -147,7 +275,7 @@ export default function MisPagos() {
                 {pago?.archivo_url && (
                   <button
                     type="button"
-                    onClick={() => verComprobante(pago.archivo_url!)}
+                    onClick={() => verArchivo(pago.archivo_url!)}
                     className="text-sm text-marca-700 underline"
                   >
                     Ver comprobante

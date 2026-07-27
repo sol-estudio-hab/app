@@ -1,9 +1,16 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { diaDePago, mesesTranscurridos } from '../lib/fechas'
+import { getSupabase } from '../lib/supabase'
 
 export default function MiPerfil() {
-  const { huesped, acuerdoActivo } = useAuth()
+  const { huesped, acuerdoActivo, recargarPerfil } = useAuth()
+
+  const [editandoNombres, setEditandoNombres] = useState(false)
+  const [nombres, setNombres] = useState(huesped?.nombres ?? '')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   if (!huesped) {
     return (
@@ -16,12 +23,84 @@ export default function MiPerfil() {
     )
   }
 
+  function iniciarEdicion() {
+    setNombres(huesped!.nombres)
+    setError(null)
+    setEditandoNombres(true)
+  }
+
+  async function guardarNombres() {
+    setError(null)
+    if (!nombres.trim()) {
+      setError('El nombre no puede quedar vacío.')
+      return
+    }
+    setGuardando(true)
+    const { error: errorGuardar } = await getSupabase()
+      .from('huespedes')
+      .update({ nombres: nombres.trim() })
+      .eq('id', huesped!.id)
+    setGuardando(false)
+    if (errorGuardar) {
+      setError('No se pudo guardar el nombre. Intenta de nuevo.')
+      return
+    }
+    await recargarPerfil()
+    setEditandoNombres(false)
+  }
+
   return (
     <section className="mx-auto max-w-md">
       <h1 className="text-xl font-bold text-marca-900">Mi perfil</h1>
 
       <dl className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-        <Fila etiqueta="Nombres" valor={huesped.nombres} />
+        <div className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+          <dt className="shrink-0 text-slate-500">Nombres</dt>
+          {editandoNombres ? (
+            <div className="flex flex-1 items-center justify-end gap-2">
+              <input
+                value={nombres}
+                onChange={(e) => setNombres(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-2 py-1 text-right font-medium text-slate-900 focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+              />
+            </div>
+          ) : (
+            <dd className="font-medium text-slate-900">{huesped.nombres}</dd>
+          )}
+        </div>
+
+        {editandoNombres ? (
+          <div className="flex justify-end gap-2 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setEditandoNombres(false)}
+              className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={guardarNombres}
+              disabled={guardando}
+              className="rounded-lg bg-marca-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-800 disabled:opacity-60"
+            >
+              {guardando ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end px-4 py-2">
+            <button
+              type="button"
+              onClick={iniciarEdicion}
+              className="text-xs font-semibold text-marca-700 underline"
+            >
+              Editar nombre
+            </button>
+          </div>
+        )}
+
+        {error && <p className="px-4 pb-3 text-xs text-red-600">{error}</p>}
+
         <Fila etiqueta="Correo" valor={huesped.correo} />
         <Fila etiqueta="Habitación" valor={huesped.numero_habitacion} />
         <Fila etiqueta="Estado de la cuenta" valor={huesped.activo ? 'Activa' : 'Inactiva'} />
@@ -42,6 +121,11 @@ export default function MiPerfil() {
               valor={`${mesesTranscurridos(acuerdoActivo.fecha_ingreso)} de ${acuerdoActivo.meses_acuerdo}`}
             />
           </dl>
+          <p className="mt-2 text-xs text-slate-500">
+            La habitación, la fecha de ingreso y el número de meses no se pueden editar desde la
+            app. Si necesitas actualizar alguno de estos datos, contacta al administrador
+            indicando qué dato deseas cambiar y el motivo del cambio.
+          </p>
           <Link to="/pagos" className="mt-4 inline-block text-marca-700 underline">
             Ver mis pagos
           </Link>

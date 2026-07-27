@@ -32,6 +32,18 @@ export interface Pago {
   observaciones: string | null
 }
 
+export interface Deposito {
+  id: string
+  acuerdo_id: string
+  numero_cargue: 1 | 2
+  archivo_url: string | null
+  estado: EstadoPago
+  fecha_carga: string | null
+  verificado_por: string | null
+  fecha_verificacion: string | null
+  observaciones: string | null
+}
+
 export type TipoNotificacion = 'recordatorio' | 'mora' | 'confirmacion' | 'fin_acuerdo' | 'aviso_basura'
 export type CanalNotificacion = 'correo' | 'push' | 'app'
 

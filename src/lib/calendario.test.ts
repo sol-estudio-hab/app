@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estadoDelMes, formatearMes, generarMesesAcuerdo } from './calendario'
+import { estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from './calendario'
 import type { Pago } from '../types/dominio'
 
 function pago(estado: Pago['estado']): Pago {
@@ -84,6 +84,28 @@ describe('estadoDelMes', () => {
 
   it('un día después del vencimiento ya es "vencido"', () => {
     expect(estadoDelMes(new Date(2026, 6, 16), undefined, hoy)).toBe('vencido')
+  })
+})
+
+describe('estadoDeposito', () => {
+  it('verificado se mantiene verificado', () => {
+    expect(estadoDeposito('verificado')).toBe('verificado')
+  })
+
+  it('cargado es "en_revision"', () => {
+    expect(estadoDeposito('cargado')).toBe('en_revision')
+  })
+
+  it('rechazado es "rechazado"', () => {
+    expect(estadoDeposito('rechazado')).toBe('rechazado')
+  })
+
+  it('sin cargue (undefined) es "pendiente"', () => {
+    expect(estadoDeposito(undefined)).toBe('pendiente')
+  })
+
+  it('estado "pendiente" explícito es "pendiente"', () => {
+    expect(estadoDeposito('pendiente')).toBe('pendiente')
   })
 })
 

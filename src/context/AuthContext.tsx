@@ -31,6 +31,7 @@ interface EstadoAuth {
   cerrarSesion: () => Promise<void>
   recuperarContrasena: (correo: string) => Promise<{ error: string | null }>
   actualizarContrasena: (nuevaContrasena: string) => Promise<{ error: string | null }>
+  recargarPerfil: () => Promise<void>
 }
 
 const AuthContext = createContext<EstadoAuth | null>(null)
@@ -158,6 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error ? traducirError(error.message) : null }
   }
 
+  async function recargarPerfil() {
+    if (sesion?.user) await cargarPerfil(sesion.user.id)
+  }
+
   const valor: EstadoAuth = {
     cargando,
     sesion,
@@ -169,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     cerrarSesion,
     recuperarContrasena,
     actualizarContrasena,
+    recargarPerfil,
   }
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>
