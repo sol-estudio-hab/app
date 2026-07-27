@@ -20,6 +20,7 @@ export default function DetalleHuespedAdmin() {
   const [activo, setActivo] = useState(true)
   const [fechaIngreso, setFechaIngreso] = useState('')
   const [mesesAcuerdo, setMesesAcuerdo] = useState('')
+  const [depositoPagoUnico, setDepositoPagoUnico] = useState(false)
 
   const [rechazandoMes, setRechazandoMes] = useState<string | null>(null)
   const [motivoRechazo, setMotivoRechazo] = useState('')
@@ -55,6 +56,7 @@ export default function DetalleHuespedAdmin() {
     if (a) {
       setFechaIngreso(a.fecha_ingreso)
       setMesesAcuerdo(String(a.meses_acuerdo))
+      setDepositoPagoUnico(a.deposito_pago_unico)
       const [pagosRes, depositosRes] = await Promise.all([
         supabase.from('pagos').select('*').eq('acuerdo_id', a.id),
         supabase.from('depositos').select('*').eq('acuerdo_id', a.id),
@@ -96,7 +98,11 @@ export default function DetalleHuespedAdmin() {
     if (acuerdo) {
       const resultado = await supabase
         .from('acuerdos')
-        .update({ fecha_ingreso: fechaIngreso, meses_acuerdo: Number(mesesAcuerdo) })
+        .update({
+          fecha_ingreso: fechaIngreso,
+          meses_acuerdo: Number(mesesAcuerdo),
+          deposito_pago_unico: depositoPagoUnico,
+        })
         .eq('id', acuerdo.id)
       errorAcuerdo = resultado.error?.message ?? null
     }
@@ -270,8 +276,23 @@ export default function DetalleHuespedAdmin() {
       {acuerdo && (
         <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="font-semibold text-slate-900">Depósito de garantía</h2>
+
+          <label className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={depositoPagoUnico}
+              onChange={(e) => setDepositoPagoUnico(e.target.checked)}
+            />
+            El depósito se pagó completo en el cargue 1 (ocultar el cargue 2 al huésped)
+          </label>
+          {depositoPagoUnico !== acuerdo.deposito_pago_unico && (
+            <p className="mt-1 text-xs text-amber-600">
+              Recuerda hacer clic en &quot;Guardar cambios&quot; para aplicar este cambio.
+            </p>
+          )}
+
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {([1, 2] as const).map((numeroCargue) => {
+            {(depositoPagoUnico ? ([1] as const) : ([1, 2] as const)).map((numeroCargue) => {
               const deposito = depositos.find((d) => d.numero_cargue === numeroCargue)
               const estado = estadoDeposito(deposito?.estado)
               return (

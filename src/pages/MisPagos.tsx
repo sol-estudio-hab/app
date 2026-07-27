@@ -195,7 +195,7 @@ export default function MisPagos() {
         </p>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {([1, 2] as const).map((numeroCargue) => {
+          {(acuerdoActivo.deposito_pago_unico ? ([1] as const) : ([1, 2] as const)).map((numeroCargue) => {
             const deposito = depositos.find((d) => d.numero_cargue === numeroCargue)
             const estado = estadoDeposito(deposito?.estado)
             return (

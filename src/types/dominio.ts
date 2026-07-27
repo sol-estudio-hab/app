@@ -18,6 +18,7 @@ export interface Acuerdo {
   meses_acuerdo: number
   estado: EstadoAcuerdo
   creado_en: string
+  deposito_pago_unico: boolean
 }
 
 export interface Pago {
