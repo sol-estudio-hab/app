@@ -2,17 +2,21 @@
 //
 // Job diario (ver README para la programación con pg_cron). Recorre los
 // acuerdos activos y, por cada mes sin comprobante cargado/verificado:
-//   - día de pago + 2 días  → notificación "recordatorio"
-//   - día de pago + 6 días  → notificación "mora"
+//   - día de pago + 2 días  → notificación "recordatorio" (correo + push)
+//   - día de pago + 6 días  → notificación "mora" (correo + push)
+//   - día de pago + 10 días → notificación "mora_whatsapp" (solo WhatsApp,
+//     si el huésped tiene número registrado)
 // Además, si ya se cumplieron los meses del acuerdo, lo marca como
 // finalizado, desactiva al huésped y envía el aviso de fin de acuerdo.
 //
 // Requiere los secrets: CRON_SECRET, RESEND_API_KEY, CORREO_REMITENTE,
-// VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY (ver README).
+// VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, WHATSAPP_TOKEN,
+// WHATSAPP_PHONE_NUMBER_ID (ver README).
 
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { enviarCorreo } from '../_shared/correo.ts'
 import { enviarPushAHuesped } from '../_shared/push.ts'
+import { enviarWhatsapp } from '../_shared/whatsapp.ts'
 import { fechaFinAcuerdo, generarMesesAcuerdo, mismaFecha, sumarDias } from '../_shared/calendario.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -25,7 +29,12 @@ interface Acuerdo {
   huesped_id: string
   fecha_ingreso: string
   meses_acuerdo: number
-  huespedes: { correo: string; nombres: string; numero_habitacion: string }
+  huespedes: {
+    correo: string
+    nombres: string
+    numero_habitacion: string
+    numero_whatsapp: string | null
+  }
 }
 
 interface Pago {
@@ -82,6 +91,27 @@ async function registrarYNotificar(
   }
 }
 
+async function notificarWhatsapp(
+  supabase: SupabaseClient,
+  huespedId: string,
+  numeroWhatsapp: string | null,
+  mesReferencia: string,
+  template: string,
+  parametros: string[],
+) {
+  if (!numeroWhatsapp) return
+  const claimWhatsapp = await supabase
+    .from('notificaciones')
+    .insert({ huesped_id: huespedId, tipo: 'mora_whatsapp', canal: 'whatsapp', mes_referencia: mesReferencia })
+    .select('id')
+    .single()
+  if (!claimWhatsapp.error) {
+    // El nombre de la plantilla debe coincidir con la aprobada en Meta
+    // Business Manager (ver README).
+    await enviarWhatsapp({ to: numeroWhatsapp, template, parametros })
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.headers.get('x-cron-secret') !== CRON_SECRET) {
     return new Response('No autorizado', { status: 401 })
@@ -93,7 +123,7 @@ Deno.serve(async (req) => {
   const { data: acuerdosData, error: errorAcuerdos } = await supabase
     .from('acuerdos')
     .select(
-      'id, huesped_id, fecha_ingreso, meses_acuerdo, huespedes!inner(correo, nombres, numero_habitacion, activo)',
+      'id, huesped_id, fecha_ingreso, meses_acuerdo, huespedes!inner(correo, nombres, numero_habitacion, numero_whatsapp, activo)',
     )
     .eq('estado', 'activo')
     .eq('huespedes.activo', true)
@@ -113,6 +143,7 @@ Deno.serve(async (req) => {
 
   let recordatorios = 0
   let moras = 0
+  let moraWhatsapp = 0
   let finesDeAcuerdo = 0
 
   for (const acuerdo of acuerdos) {
@@ -152,6 +183,18 @@ Deno.serve(async (req) => {
         )
         moras++
       }
+
+      if (mismaFecha(sumarDias(vencimiento, 10), hoy)) {
+        await notificarWhatsapp(
+          supabase,
+          acuerdo.huesped_id,
+          acuerdo.huespedes.numero_whatsapp,
+          mes,
+          'recordatorio_pago_10dias',
+          [acuerdo.huespedes.nombres, acuerdo.huespedes.numero_habitacion, mes],
+        )
+        moraWhatsapp++
+      }
     }
 
     const fin = fechaFinAcuerdo(acuerdo.fecha_ingreso, acuerdo.meses_acuerdo)
@@ -174,5 +217,5 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ recordatorios, moras, finesDeAcuerdo }), { status: 200 })
+  return new Response(JSON.stringify({ recordatorios, moras, moraWhatsapp, finesDeAcuerdo }), { status: 200 })
 })

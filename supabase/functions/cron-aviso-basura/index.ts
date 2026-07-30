@@ -2,14 +2,17 @@
 //
 // Job de martes, jueves y sábado (ver README para la programación con
 // pg_cron). Avisa a todos los huéspedes activos que hoy es día de sacar
-// la basura, por correo, push y en el centro de notificaciones de la app.
+// la basura, por correo, push, WhatsApp (si el huésped tiene número
+// registrado) y en el centro de notificaciones de la app.
 //
 // Requiere los secrets: CRON_SECRET, RESEND_API_KEY, CORREO_REMITENTE,
-// VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY (ver README).
+// VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, WHATSAPP_TOKEN,
+// WHATSAPP_PHONE_NUMBER_ID (ver README).
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { enviarCorreo } from '../_shared/correo.ts'
 import { enviarPushAHuesped } from '../_shared/push.ts'
+import { enviarWhatsapp } from '../_shared/whatsapp.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -61,7 +64,7 @@ Deno.serve(async (req) => {
 
   const { data: huespedes, error } = await supabase
     .from('huespedes')
-    .select('id, correo')
+    .select('id, correo, numero_whatsapp')
     .eq('activo', true)
 
   if (error) {
@@ -98,6 +101,19 @@ Deno.serve(async (req) => {
         title: 'Sacar la basura 🗑️',
         body: 'Hoy es día de sacar la basura en Sol Estudio Hab.',
       })
+    }
+
+    if (huesped.numero_whatsapp) {
+      const claimWhatsapp = await supabase
+        .from('notificaciones')
+        .insert({ huesped_id: huesped.id, tipo: 'aviso_basura', canal: 'whatsapp', mes_referencia: null })
+        .select('id')
+        .single()
+      if (!claimWhatsapp.error) {
+        // "aviso_basura" debe coincidir exactamente con el nombre de la
+        // plantilla aprobada en Meta Business Manager (ver README).
+        await enviarWhatsapp({ to: huesped.numero_whatsapp, template: 'aviso_basura' })
+      }
     }
 
     enviados++

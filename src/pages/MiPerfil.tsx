@@ -7,8 +7,9 @@ import { getSupabase } from '../lib/supabase'
 export default function MiPerfil() {
   const { huesped, acuerdoActivo, recargarPerfil } = useAuth()
 
-  const [editandoNombres, setEditandoNombres] = useState(false)
+  const [editando, setEditando] = useState(false)
   const [nombres, setNombres] = useState(huesped?.nombres ?? '')
+  const [numeroWhatsapp, setNumeroWhatsapp] = useState(huesped?.numero_whatsapp ?? '')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,11 +26,12 @@ export default function MiPerfil() {
 
   function iniciarEdicion() {
     setNombres(huesped!.nombres)
+    setNumeroWhatsapp(huesped!.numero_whatsapp ?? '')
     setError(null)
-    setEditandoNombres(true)
+    setEditando(true)
   }
 
-  async function guardarNombres() {
+  async function guardarPerfil() {
     setError(null)
     if (!nombres.trim()) {
       setError('El nombre no puede quedar vacío.')
@@ -38,15 +40,15 @@ export default function MiPerfil() {
     setGuardando(true)
     const { error: errorGuardar } = await getSupabase()
       .from('huespedes')
-      .update({ nombres: nombres.trim() })
+      .update({ nombres: nombres.trim(), numero_whatsapp: numeroWhatsapp.trim() || null })
       .eq('id', huesped!.id)
     setGuardando(false)
     if (errorGuardar) {
-      setError('No se pudo guardar el nombre. Intenta de nuevo.')
+      setError('No se pudo guardar. Intenta de nuevo.')
       return
     }
     await recargarPerfil()
-    setEditandoNombres(false)
+    setEditando(false)
   }
 
   return (
@@ -56,7 +58,7 @@ export default function MiPerfil() {
       <dl className="mt-6 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
         <div className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
           <dt className="shrink-0 text-slate-500">Nombres</dt>
-          {editandoNombres ? (
+          {editando ? (
             <div className="flex flex-1 items-center justify-end gap-2">
               <input
                 value={nombres}
@@ -69,18 +71,37 @@ export default function MiPerfil() {
           )}
         </div>
 
-        {editandoNombres ? (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+          <dt className="shrink-0 text-slate-500">WhatsApp</dt>
+          {editando ? (
+            <div className="flex flex-1 items-center justify-end gap-2">
+              <input
+                type="tel"
+                value={numeroWhatsapp}
+                onChange={(e) => setNumeroWhatsapp(e.target.value)}
+                placeholder="Sin registrar"
+                className="w-full rounded-lg border border-slate-300 px-2 py-1 text-right font-medium text-slate-900 focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+              />
+            </div>
+          ) : (
+            <dd className="font-medium text-slate-900">
+              {huesped.numero_whatsapp || 'Sin registrar'}
+            </dd>
+          )}
+        </div>
+
+        {editando ? (
           <div className="flex justify-end gap-2 px-4 py-3">
             <button
               type="button"
-              onClick={() => setEditandoNombres(false)}
+              onClick={() => setEditando(false)}
               className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
             >
               Cancelar
             </button>
             <button
               type="button"
-              onClick={guardarNombres}
+              onClick={guardarPerfil}
               disabled={guardando}
               className="rounded-lg bg-marca-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-800 disabled:opacity-60"
             >
@@ -94,7 +115,7 @@ export default function MiPerfil() {
               onClick={iniciarEdicion}
               className="text-xs font-semibold text-marca-700 underline"
             >
-              Editar nombre
+              Editar nombre / WhatsApp
             </button>
           </div>
         )}

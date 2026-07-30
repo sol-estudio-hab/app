@@ -108,13 +108,15 @@ abajo son 8:00 a.m. en Colombia, `America/Bogota`, UTC-5):
 
 - **[cron-recordatorios-pago](supabase/functions/cron-recordatorios-pago)** — todos los días.
   Por cada mes sin comprobante cargado/verificado: día de pago +2 días → recordatorio; +6 días →
-  mora. Si ya se cumplieron los meses del acuerdo, lo marca `finalizado`, desactiva al huésped y
-  envía el aviso de fin de acuerdo.
+  mora; +10 días → recordatorio adicional **solo por WhatsApp** (si el huésped tiene número
+  registrado). Si ya se cumplieron los meses del acuerdo, lo marca `finalizado`, desactiva al
+  huésped y envía el aviso de fin de acuerdo.
 - **[cron-aviso-basura](supabase/functions/cron-aviso-basura)** — martes, jueves y sábado. Avisa a
   todos los huéspedes activos que hoy es día de sacar la basura.
 
 Cada notificación se envía por **correo**, **push** (si el huésped activó notificaciones en su
-perfil) y queda registrada en el centro de notificaciones **dentro de la app** (`/notificaciones`).
+perfil), **WhatsApp** (si tiene número registrado y está configurado — ver sección siguiente) y
+queda registrada en el centro de notificaciones **dentro de la app** (`/notificaciones`).
 
 ### Desplegar
 
@@ -188,6 +190,45 @@ select cron.schedule(
 
 El archivo [0006_cron_jobs.sql](supabase/migrations/0006_cron_jobs.sql) trae la misma programación
 con marcadores — no lo pegues tal cual sin reemplazarlos primero.
+
+## Avisos por WhatsApp (opcional)
+
+Además de correo y push, `cron-aviso-basura` y `cron-recordatorios-pago` (a los +10 días) pueden
+avisar por **WhatsApp** a los huéspedes que tengan un número registrado (campo "Número de
+WhatsApp", editable por el huésped en Mi Perfil o por el admin en el detalle de huésped). Mientras
+no se configuren los secrets de abajo, este canal simplemente no se activa — el resto de la app
+sigue funcionando igual.
+
+### Qué se necesita del lado de Meta (no se puede hacer por código, requiere tu propia cuenta)
+
+1. Cuenta de **Meta Business Manager** + una app de **WhatsApp Business Platform** en
+   [developers.facebook.com](https://developers.facebook.com/).
+2. Un número de teléfono para registrar (una SIM prepago colombiana de Claro, Movistar o Tigo
+   sirve — evita WOM, que sí exige recargar cada 30 días). El saldo no vence en esas operadoras,
+   así que basta con una recarga inicial.
+3. Verificar el negocio en Meta (necesario para levantar los límites de envío).
+4. Crear y enviar a aprobación **2 plantillas** (categoría *Utility*, la más barata):
+   - `aviso_basura` — mismo texto que la plantilla de correo (ver
+     [cron-aviso-basura/index.ts](supabase/functions/cron-aviso-basura/index.ts)), sin variables.
+   - `recordatorio_pago_10dias` — con 3 variables en el cuerpo: `{{1}}` nombre del huésped,
+     `{{2}}` número de habitación, `{{3}}` mes en mora. Ejemplo de texto:
+     > Hola {{1}}, el pago de la habitación {{2}} correspondiente a {{3}} sigue sin comprobante
+     > después de 10 días. Por favor regulariza tu pago o sube el comprobante en la app.
+5. Con la app ya verificada, generar un **token de acceso permanente** (System User token) y
+   copiar el **Phone Number ID**.
+
+Si cambias los nombres de las plantillas al aprobarlas, actualiza el `template:` correspondiente en
+`cron-aviso-basura/index.ts` y `cron-recordatorios-pago/index.ts` antes de desplegar.
+
+### Configurar y desplegar
+
+```bash
+supabase secrets set \
+  WHATSAPP_TOKEN=<token permanente de Meta> \
+  WHATSAPP_PHONE_NUMBER_ID=<phone number id de Meta>
+supabase functions deploy cron-aviso-basura
+supabase functions deploy cron-recordatorios-pago
+```
 
 ## Reportes y respaldo (Fase 5)
 

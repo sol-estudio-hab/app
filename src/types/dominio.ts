@@ -6,6 +6,7 @@ export interface Huesped {
   correo: string
   nombres: string
   numero_habitacion: string
+  numero_whatsapp: string | null
   activo: boolean
   creado_en: string
   actualizado_en: string

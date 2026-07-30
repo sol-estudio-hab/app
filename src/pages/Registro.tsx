@@ -13,6 +13,7 @@ export default function Registro() {
   const [numeroHabitacion, setNumeroHabitacion] = useState('')
   const [fechaIngreso, setFechaIngreso] = useState('')
   const [mesesAcuerdo, setMesesAcuerdo] = useState('')
+  const [numeroWhatsapp, setNumeroWhatsapp] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
@@ -56,6 +57,7 @@ export default function Registro() {
       numeroHabitacion,
       fechaIngreso,
       mesesAcuerdo: Number(mesesAcuerdo),
+      numeroWhatsapp: numeroWhatsapp.trim() || undefined,
     })
     setEnviando(false)
     if (errorRegistro) {
@@ -130,6 +132,13 @@ export default function Registro() {
           onCambio={setMesesAcuerdo}
           min={1}
         />
+        <Campo
+          etiqueta="Número de WhatsApp"
+          tipo="tel"
+          valor={numeroWhatsapp}
+          onCambio={setNumeroWhatsapp}
+          opcional
+        />
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -168,6 +177,9 @@ export default function Registro() {
                 valor={new Date(`${fechaIngreso}T00:00:00`).toLocaleDateString('es')}
               />
               <FilaConfirmacion etiqueta="Meses del acuerdo" valor={mesesAcuerdo} />
+              {numeroWhatsapp.trim() && (
+                <FilaConfirmacion etiqueta="WhatsApp" valor={numeroWhatsapp.trim()} />
+              )}
             </dl>
 
             {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

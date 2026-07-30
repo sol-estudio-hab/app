@@ -17,6 +17,7 @@ export default function DetalleHuespedAdmin() {
 
   const [nombres, setNombres] = useState('')
   const [numeroHabitacion, setNumeroHabitacion] = useState('')
+  const [numeroWhatsapp, setNumeroWhatsapp] = useState('')
   const [activo, setActivo] = useState(true)
   const [fechaIngreso, setFechaIngreso] = useState('')
   const [mesesAcuerdo, setMesesAcuerdo] = useState('')
@@ -51,6 +52,7 @@ export default function DetalleHuespedAdmin() {
     if (h) {
       setNombres(h.nombres)
       setNumeroHabitacion(h.numero_habitacion)
+      setNumeroWhatsapp(h.numero_whatsapp ?? '')
       setActivo(h.activo)
     }
     if (a) {
@@ -91,7 +93,12 @@ export default function DetalleHuespedAdmin() {
     const supabase = getSupabase()
     const { error: errorHuesped } = await supabase
       .from('huespedes')
-      .update({ nombres, numero_habitacion: numeroHabitacion, activo })
+      .update({
+        nombres,
+        numero_habitacion: numeroHabitacion,
+        numero_whatsapp: numeroWhatsapp.trim() || null,
+        activo,
+      })
       .eq('id', huesped.id)
 
     let errorAcuerdo: string | null = null
@@ -230,6 +237,16 @@ export default function DetalleHuespedAdmin() {
           <input
             value={numeroHabitacion}
             onChange={(e) => setNumeroHabitacion(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          Número de WhatsApp
+          <input
+            type="tel"
+            value={numeroWhatsapp}
+            onChange={(e) => setNumeroWhatsapp(e.target.value)}
+            placeholder="Sin registrar"
             className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
           />
         </label>

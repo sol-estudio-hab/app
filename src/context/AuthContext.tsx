@@ -14,6 +14,7 @@ interface DatosRegistro {
   numeroHabitacion: string
   fechaIngreso: string
   mesesAcuerdo: number
+  numeroWhatsapp?: string
 }
 
 interface EstadoAuth {
@@ -126,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           numero_habitacion: datos.numeroHabitacion,
           fecha_ingreso: datos.fechaIngreso,
           meses_acuerdo: datos.mesesAcuerdo,
+          ...(datos.numeroWhatsapp ? { numero_whatsapp: datos.numeroWhatsapp } : {}),
         },
       },
     })
