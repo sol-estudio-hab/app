@@ -35,7 +35,7 @@ function plantillaAvisoBasura(): string {
                 <p style="margin:0 0 16px;">Buen día.</p>
                 <p style="margin:0 0 16px;"><strong>Hoy es día de sacar la basura.</strong></p>
                 <p style="margin:0 0 16px;">Recuerden que se realiza los martes, jueves y sábados en la mañana, especialmente la generada en la cocina.</p>
-                <p style="margin:0 0 16px;">Por favor, ayudemos a mantener las zonas comunes libres de basura.</p>
+                <p style="margin:0 0 16px;">Mantener las zonas comunes libres de basura es responsabilidad de todos.</p>
                 <p style="margin:0;">Gracias por sostener el orden y la limpieza.</p>
               </td>
             </tr>
