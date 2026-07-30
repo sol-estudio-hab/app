@@ -15,6 +15,43 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const CRON_SECRET = Deno.env.get('CRON_SECRET')!
 
+// Estructura basada en tablas con estilos en línea: es lo que hace falta
+// para que el correo se vea igual en Gmail, Outlook y demás clientes, que
+// ignoran o recortan las hojas de estilo normales.
+function plantillaAvisoBasura(): string {
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:24px 0;font-family:Arial,Helvetica,sans-serif;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;max-width:480px;width:100%;">
+            <tr>
+              <td style="background-color:#0f766e;padding:20px 24px;">
+                <span style="font-size:20px;vertical-align:middle;">🗑️</span>
+                <span style="color:#ffffff;font-size:18px;font-weight:bold;vertical-align:middle;margin-left:8px;">Sol Estudio Hab</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;color:#1f2937;font-size:15px;line-height:1.6;">
+                <p style="margin:0 0 16px;">Buen día.</p>
+                <p style="margin:0 0 16px;"><strong>Hoy es día de sacar la basura.</strong></p>
+                <p style="margin:0 0 16px;">Recuerden que se realiza los martes, jueves y sábados en la mañana, especialmente la generada en la cocina.</p>
+                <p style="margin:0 0 16px;">Por favor, ayudemos a mantener las zonas comunes libres de basura.</p>
+                <p style="margin:0;">Gracias por sostener el orden y la limpieza.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;background-color:#f8fafc;color:#64748b;font-size:13px;border-top:1px solid #e2e8f0;">
+                — Administración<br>
+                Sol Estudio Hab
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `
+}
+
 Deno.serve(async (req) => {
   if (req.headers.get('x-cron-secret') !== CRON_SECRET) {
     return new Response('No autorizado', { status: 401 })
@@ -24,7 +61,7 @@ Deno.serve(async (req) => {
 
   const { data: huespedes, error } = await supabase
     .from('huespedes')
-    .select('id, correo, nombres')
+    .select('id, correo')
     .eq('activo', true)
 
   if (error) {
@@ -47,9 +84,7 @@ Deno.serve(async (req) => {
       await enviarCorreo({
         to: [huesped.correo],
         subject: 'Hoy es día de sacar la basura — Sol Estudio Hab',
-        html: `<p>Hola ${huesped.nombres},</p>
-               <p>Te recordamos que hoy es día de sacar la basura en Sol Estudio Hab.</p>
-               <p>Gracias por tu colaboración.</p>`,
+        html: plantillaAvisoBasura(),
       })
     }
 
