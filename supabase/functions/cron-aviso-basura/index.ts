@@ -32,17 +32,17 @@ function plantillaAvisoBasura(): string {
             </tr>
             <tr>
               <td style="padding:24px;color:#1f2937;font-size:15px;line-height:1.6;">
-                <p style="margin:0 0 16px;">Buen día.</p>
-                <p style="margin:0 0 16px;"><strong>Hoy es día de sacar la basura.</strong></p>
-                <p style="margin:0 0 16px;">Recuerden que se realiza los martes, jueves y sábados en la mañana, especialmente la generada en la cocina.</p>
-                <p style="margin:0 0 16px;">Mantener las zonas comunes libres de basura es responsabilidad de todos.</p>
-                <p style="margin:0;">Gracias por sostener el orden y la limpieza.</p>
+                <p style="margin:0 0 16px;"><strong>Buen día.</strong></p>
+                <p style="margin:0 0 16px;">Hoy corresponde sacar la basura.</p>
+                <p style="margin:0 0 16px;">Les recordamos que la recolección se realiza los <strong>martes, jueves y sábados en la mañana</strong>, especialmente para los residuos generados en la cocina.</p>
+                <p style="margin:0 0 16px;">Mantener las zonas comunes libres de basura contribuye a que todos disfrutemos de un espacio limpio, agradable y ordenado.</p>
+                <p style="margin:0;">Gracias por sostener el orden, la limpieza y por ayudar a conservar el buen estado de la casa.</p>
               </td>
             </tr>
             <tr>
               <td style="padding:16px 24px;background-color:#f8fafc;color:#64748b;font-size:13px;border-top:1px solid #e2e8f0;">
-                — Administración<br>
-                Sol Estudio Hab
+                <strong>— Administración</strong><br>
+                <strong>Sol Estudio Hab</strong>
               </td>
             </tr>
           </table>
