@@ -26,7 +26,8 @@ export default function Registro() {
       !nombres ||
       !numeroHabitacion ||
       !fechaIngreso ||
-      !mesesAcuerdo
+      !mesesAcuerdo ||
+      !numeroWhatsapp
     ) {
       return 'Todos los campos son obligatorios.'
     }
@@ -57,7 +58,7 @@ export default function Registro() {
       numeroHabitacion,
       fechaIngreso,
       mesesAcuerdo: Number(mesesAcuerdo),
-      numeroWhatsapp: numeroWhatsapp.trim() || undefined,
+      numeroWhatsapp: numeroWhatsapp.trim(),
     })
     setEnviando(false)
     if (errorRegistro) {
@@ -137,7 +138,6 @@ export default function Registro() {
           tipo="tel"
           valor={numeroWhatsapp}
           onCambio={setNumeroWhatsapp}
-          opcional
         />
 
         {error && <p className="text-sm text-red-600">{error}</p>}

@@ -11,7 +11,7 @@ const WHATSAPP_TOKEN = Deno.env.get('WHATSAPP_TOKEN')!
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')!
 
 interface EnvioWhatsapp {
-  /** Número en formato E.164 sin el símbolo "+" (ej: 573001234567). */
+  /** Número tal como lo guardó el huésped (con o sin indicativo de país). */
   to: string
   /** Nombre exacto de la plantilla aprobada en Meta Business Manager. */
   template: string
@@ -20,10 +20,21 @@ interface EnvioWhatsapp {
   parametros?: string[]
 }
 
+/**
+ * Normaliza un número de WhatsApp al formato que espera la Cloud API
+ * (indicativo de país + número, sin espacios/guiones/"+"). Si el huésped
+ * no incluyó el indicativo (los celulares colombianos tienen 10 dígitos
+ * sin él), se le agrega el de Colombia (57) para que el envío no falle.
+ */
+export function normalizarNumeroWhatsapp(numero: string): string {
+  const soloDigitos = numero.replace(/\D/g, '')
+  return soloDigitos.length === 10 ? `57${soloDigitos}` : soloDigitos
+}
+
 export async function enviarWhatsapp(envio: EnvioWhatsapp, intentos = 2): Promise<boolean> {
   const body = {
     messaging_product: 'whatsapp',
-    to: envio.to,
+    to: normalizarNumeroWhatsapp(envio.to),
     type: 'template',
     template: {
       name: envio.template,
