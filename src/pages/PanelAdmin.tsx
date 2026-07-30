@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import EstadoPagoBadge from '../components/EstadoPagoBadge'
+import { TAMANO_MAXIMO_BYTES } from '../lib/archivos'
 import { estadoDelMes, generarMesesAcuerdo, type EstadoMes } from '../lib/calendario'
 import { getSupabase } from '../lib/supabase'
 import type { Acuerdo, Huesped, Pago } from '../types/dominio'
+
+const RUTA_REGLAMENTO = 'reglamento/reglamento-convivencia.pdf'
 
 interface FilaHuesped {
   huesped: Huesped
@@ -17,6 +20,28 @@ function mesActualComoTexto(hoy: Date): string {
 export default function PanelAdmin() {
   const [filas, setFilas] = useState<FilaHuesped[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [subiendoReglamento, setSubiendoReglamento] = useState(false)
+  const [mensajeReglamento, setMensajeReglamento] = useState<string | null>(null)
+
+  async function subirReglamento(archivo: File) {
+    setMensajeReglamento(null)
+    if (archivo.type !== 'application/pdf') {
+      setMensajeReglamento('El reglamento debe ser un archivo PDF.')
+      return
+    }
+    if (archivo.size > TAMANO_MAXIMO_BYTES) {
+      setMensajeReglamento('El archivo supera el tamaño máximo de 10 MB.')
+      return
+    }
+    setSubiendoReglamento(true)
+    const { error: errorSubida } = await getSupabase()
+      .storage.from('contratos')
+      .upload(RUTA_REGLAMENTO, archivo, { upsert: true, contentType: 'application/pdf' })
+    setSubiendoReglamento(false)
+    setMensajeReglamento(
+      errorSubida ? 'No se pudo subir el reglamento. Intenta de nuevo.' : 'Reglamento actualizado.',
+    )
+  }
 
   useEffect(() => {
     async function cargar() {
@@ -63,6 +88,30 @@ export default function PanelAdmin() {
       <p className="mt-1 text-sm text-slate-600">Estado de pago del mes actual por huésped.</p>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-4">
+        <div>
+          <h2 className="font-semibold text-slate-900">Reglamento de convivencia</h2>
+          <p className="text-xs text-slate-500">
+            Documento único que se envía junto con cada contrato que se cargue a un huésped.
+          </p>
+          {mensajeReglamento && <p className="mt-1 text-xs text-slate-600">{mensajeReglamento}</p>}
+        </div>
+        <label className="cursor-pointer rounded-lg bg-marca-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-800">
+          {subiendoReglamento ? 'Subiendo…' : 'Cargar / reemplazar'}
+          <input
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            disabled={subiendoReglamento}
+            onChange={(evento) => {
+              const archivo = evento.target.files?.[0]
+              evento.target.value = ''
+              if (archivo) subirReglamento(archivo)
+            }}
+          />
+        </label>
+      </div>
 
       {filas && (
         <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white">

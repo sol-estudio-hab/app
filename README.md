@@ -101,6 +101,32 @@ Sin el webhook del paso 5, los pagos se siguen registrando con normalidad — so
 correo automático al administrador. Sin los pasos 1-3, el registro/login de huéspedes sigue
 funcionando, solo con el límite de 2-3 correos/hora del servidor compartido de Supabase.
 
+## Contratos (el admin carga, el huésped recibe correo automático)
+
+El admin carga el contrato de cada huésped desde el detalle de huésped (`/admin/huespedes/:id`,
+sección "Contratos"); se guarda el historial completo, ningún contrato reemplaza al anterior. El
+huésped los ve (solo lectura) en Mi Perfil, sección "Mis contratos".
+
+Al cargarse un contrato, se le avisan **dos correos separados** al huésped (para no mezclar
+temas): uno con el contrato adjunto, y otro con el **reglamento de convivencia** — un documento
+único para todos, que el admin sube/reemplaza desde el Panel administrador (tarjeta "Reglamento de
+convivencia"). Si todavía no se ha subido el reglamento, ese segundo correo simplemente se omite.
+
+1. **Desplegar la Edge Function:**
+
+   ```bash
+   supabase functions deploy notificar-contrato-huesped
+   ```
+
+   No necesita secrets nuevos — reutiliza `RESEND_API_KEY` y `CORREO_REMITENTE` ya configurados.
+
+2. En el dashboard de Supabase: **Database → Webhooks → Create a new hook**
+   - Tabla: `contratos` · Evento: `Insert` · Tipo: `Supabase Edge Function`
+   - Función: `notificar-contrato-huesped`
+
+Sin el webhook del paso 2, la carga de contratos sigue funcionando con normalidad (el admin y el
+huésped los ven igual en la app) — solo no se envía el correo automático.
+
 ## Recordatorios, mora y aviso de basura por cron (Fase 4)
 
 Dos Edge Functions programadas con `pg_cron` (zona horaria del servidor: UTC; los horarios de

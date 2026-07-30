@@ -46,6 +46,15 @@ export interface Deposito {
   observaciones: string | null
 }
 
+export interface Contrato {
+  id: string
+  huesped_id: string
+  archivo_url: string
+  nombre_archivo: string
+  subido_por: string
+  creado_en: string
+}
+
 export type TipoNotificacion = 'recordatorio' | 'mora' | 'confirmacion' | 'fin_acuerdo' | 'aviso_basura'
 export type CanalNotificacion = 'correo' | 'push' | 'app'
 

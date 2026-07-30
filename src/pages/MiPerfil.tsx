@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { diaDePago, mesesTranscurridos } from '../lib/fechas'
 import { getSupabase } from '../lib/supabase'
+import type { Contrato } from '../types/dominio'
 
 export default function MiPerfil() {
   const { huesped, acuerdoActivo, recargarPerfil } = useAuth()
@@ -12,6 +13,29 @@ export default function MiPerfil() {
   const [numeroWhatsapp, setNumeroWhatsapp] = useState(huesped?.numero_whatsapp ?? '')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [contratos, setContratos] = useState<Contrato[]>([])
+
+  useEffect(() => {
+    if (!huesped) return
+    getSupabase()
+      .from('contratos')
+      .select('*')
+      .eq('huesped_id', huesped.id)
+      .order('creado_en', { ascending: false })
+      .then(({ data }) => setContratos((data as Contrato[]) ?? []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [huesped?.id])
+
+  async function verContrato(archivoUrl: string) {
+    const { data, error: errorFirma } = await getSupabase()
+      .storage.from('contratos')
+      .createSignedUrl(archivoUrl, 60)
+    if (errorFirma || !data) {
+      setError('No se pudo abrir el contrato.')
+      return
+    }
+    window.open(data.signedUrl, '_blank', 'noopener')
+  }
 
   if (!huesped) {
     return (
@@ -155,6 +179,36 @@ export default function MiPerfil() {
         <p className="mt-6 text-slate-600">
           No tienes un acuerdo activo. Contacta al administrador para renovar.
         </p>
+      )}
+
+      <h2 className="mt-6 text-lg font-semibold text-marca-900">Mis contratos</h2>
+      {contratos.length === 0 ? (
+        <p className="mt-2 text-sm text-slate-600">
+          El administrador aún no ha cargado ningún contrato para tu cuenta.
+        </p>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-2">
+          {contratos.map((contrato) => (
+            <li
+              key={contrato.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-3"
+            >
+              <div>
+                <p className="text-sm font-medium text-slate-900">{contrato.nombre_archivo}</p>
+                <p className="text-xs text-slate-500">
+                  Cargado el {new Date(contrato.creado_en).toLocaleDateString('es')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => verContrato(contrato.archivo_url)}
+                className="text-sm text-marca-700 underline"
+              >
+                Ver contrato
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   )

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import EstadoPagoBadge from '../components/EstadoPagoBadge'
+import { TAMANO_MAXIMO_BYTES, TIPOS_PERMITIDOS, extensionParaMime } from '../lib/archivos'
 import { estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from '../lib/calendario'
 import { getSupabase } from '../lib/supabase'
-import type { Acuerdo, Deposito, Huesped, Pago } from '../types/dominio'
+import type { Acuerdo, Contrato, Deposito, Huesped, Pago } from '../types/dominio'
 
 export default function DetalleHuespedAdmin() {
   const { id } = useParams<{ id: string }>()
@@ -11,9 +12,11 @@ export default function DetalleHuespedAdmin() {
   const [acuerdo, setAcuerdo] = useState<Acuerdo | null>(null)
   const [pagos, setPagos] = useState<Pago[]>([])
   const [depositos, setDepositos] = useState<Deposito[]>([])
+  const [contratos, setContratos] = useState<Contrato[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [subiendoContrato, setSubiendoContrato] = useState(false)
 
   const [nombres, setNombres] = useState('')
   const [numeroHabitacion, setNumeroHabitacion] = useState('')
@@ -54,6 +57,12 @@ export default function DetalleHuespedAdmin() {
       setNumeroHabitacion(h.numero_habitacion)
       setNumeroWhatsapp(h.numero_whatsapp ?? '')
       setActivo(h.activo)
+      const contratosRes = await supabase
+        .from('contratos')
+        .select('*')
+        .eq('huesped_id', h.id)
+        .order('creado_en', { ascending: false })
+      setContratos((contratosRes.data as Contrato[]) ?? [])
     }
     if (a) {
       setFechaIngreso(a.fecha_ingreso)
@@ -131,6 +140,65 @@ export default function DetalleHuespedAdmin() {
       return
     }
     window.open(data.signedUrl, '_blank', 'noopener')
+  }
+
+  async function verContrato(archivoUrl: string) {
+    const { data, error: errorFirma } = await getSupabase()
+      .storage.from('contratos')
+      .createSignedUrl(archivoUrl, 60)
+    if (errorFirma || !data) {
+      setError('No se pudo abrir el contrato.')
+      return
+    }
+    window.open(data.signedUrl, '_blank', 'noopener')
+  }
+
+  async function subirContrato(archivo: File) {
+    if (!huesped) return
+    setError(null)
+    if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
+      setError('Solo se aceptan imágenes (JPG, PNG, WEBP) o PDF.')
+      return
+    }
+    if (archivo.size > TAMANO_MAXIMO_BYTES) {
+      setError('El archivo supera el tamaño máximo de 10 MB.')
+      return
+    }
+
+    setSubiendoContrato(true)
+    const supabase = getSupabase()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setSubiendoContrato(false)
+      return
+    }
+
+    const extension = extensionParaMime(archivo.type)
+    const ruta = `${huesped.id}/${crypto.randomUUID()}.${extension}`
+
+    const { error: errorSubida } = await supabase.storage
+      .from('contratos')
+      .upload(ruta, archivo, { contentType: archivo.type })
+
+    if (errorSubida) {
+      setError('No se pudo subir el contrato. Intenta de nuevo.')
+      setSubiendoContrato(false)
+      return
+    }
+
+    const { error: errorGuardar } = await supabase.from('contratos').insert({
+      huesped_id: huesped.id,
+      archivo_url: ruta,
+      nombre_archivo: archivo.name,
+      subido_por: user.id,
+    })
+
+    if (errorGuardar) setError('No se pudo registrar el contrato.')
+
+    setSubiendoContrato(false)
+    await cargar()
   }
 
   async function verificarPago(pago: Pago) {
@@ -288,6 +356,57 @@ export default function DetalleHuespedAdmin() {
         >
           {guardando ? 'Guardando…' : 'Guardar cambios'}
         </button>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-slate-900">Contratos</h2>
+          <label className="cursor-pointer rounded-lg bg-marca-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-800">
+            {subiendoContrato ? 'Subiendo…' : 'Cargar contrato'}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              className="hidden"
+              disabled={subiendoContrato}
+              onChange={(evento) => {
+                const archivo = evento.target.files?.[0]
+                evento.target.value = ''
+                if (archivo) subirContrato(archivo)
+              }}
+            />
+          </label>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Al cargar un contrato se le avisa automáticamente al huésped por correo, con el
+          contrato adjunto y el reglamento de convivencia en un correo aparte.
+        </p>
+
+        {contratos.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">Sin contratos cargados todavía.</p>
+        ) : (
+          <ul className="mt-3 flex flex-col gap-2">
+            {contratos.map((contrato) => (
+              <li
+                key={contrato.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-3"
+              >
+                <div>
+                  <p className="text-sm font-medium text-slate-900">{contrato.nombre_archivo}</p>
+                  <p className="text-xs text-slate-500">
+                    Cargado el {new Date(contrato.creado_en).toLocaleDateString('es')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => verContrato(contrato.archivo_url)}
+                  className="text-sm text-marca-700 underline"
+                >
+                  Ver contrato
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {acuerdo && (
