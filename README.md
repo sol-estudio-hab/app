@@ -233,7 +233,11 @@ sigue funcionando igual.
    sirve — evita WOM, que sí exige recargar cada 30 días). El saldo no vence en esas operadoras,
    así que basta con una recarga inicial.
 3. Verificar el negocio en Meta (necesario para levantar los límites de envío).
-4. Crear y enviar a aprobación **2 plantillas** (categoría *Utility*, la más barata):
+4. Crear y enviar a aprobación **2 plantillas** (categoría *Utility*, la más barata). Al crear cada
+   una, en la sección de **Botones** agrega un botón de tipo **"Visitar sitio web"** (URL estática,
+   no dinámica) apuntando a `https://pagos.solestudiohab.com/` — así el huésped tiene un botón
+   directo para ir a la app, sin que el código tenga que enviarlo aparte (el botón queda fijo en la
+   plantilla ya aprobada):
    - `aviso_basura` — mismo texto que la plantilla de correo (ver
      [cron-aviso-basura/index.ts](supabase/functions/cron-aviso-basura/index.ts)), sin variables.
    - `recordatorio_pago_10dias` — con 3 variables en el cuerpo: `{{1}}` nombre del huésped,

@@ -23,6 +23,10 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const CRON_SECRET = Deno.env.get('CRON_SECRET')!
 const ZONA_HORARIA = 'America/Bogota'
+const URL_APP = 'https://pagos.solestudiohab.com/'
+const BOTON_APP = `<p style="margin-top:16px;">
+  <a href="${URL_APP}" style="display:inline-block;background-color:#0f766e;color:#ffffff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Ir a la app</a>
+</p>`
 
 interface Acuerdo {
   id: string
@@ -162,7 +166,8 @@ Deno.serve(async (req) => {
           `Recordatorio de pago — Sol Estudio Hab (${mes})`,
           `<p>Hola ${acuerdo.huespedes.nombres},</p>
            <p>Este es un recordatorio: el pago del arriendo de la habitación ${acuerdo.huespedes.numero_habitacion} correspondiente a <strong>${mes}</strong> venció el ${vencimiento.toLocaleDateString('es')}.</p>
-           <p>Si ya realizaste el pago, ingresa a la app y sube tu comprobante. Si aún no lo has hecho, por favor ponte al día lo antes posible.</p>`,
+           <p>Si ya realizaste el pago, ingresa a la app y sube tu comprobante. Si aún no lo has hecho, por favor ponte al día lo antes posible.</p>
+           ${BOTON_APP}`,
           { title: 'Recordatorio de pago', body: `Tu pago de ${mes} está pendiente de comprobante.` },
         )
         recordatorios++
@@ -178,7 +183,8 @@ Deno.serve(async (req) => {
           `Aviso de mora — Sol Estudio Hab (${mes})`,
           `<p>Hola ${acuerdo.huespedes.nombres},</p>
            <p>Tu pago de arriendo de la habitación ${acuerdo.huespedes.numero_habitacion} correspondiente a <strong>${mes}</strong> está en mora (venció el ${vencimiento.toLocaleDateString('es')}).</p>
-           <p>Por favor realiza el pago y sube tu comprobante en la app lo antes posible. Si ya pagaste, sube el comprobante para regularizar tu cuenta.</p>`,
+           <p>Por favor realiza el pago y sube tu comprobante en la app lo antes posible. Si ya pagaste, sube el comprobante para regularizar tu cuenta.</p>
+           ${BOTON_APP}`,
           { title: 'Pago en mora', body: `Tu pago de ${mes} sigue sin comprobante. Por favor regulariza tu cuenta.` },
         )
         moras++
