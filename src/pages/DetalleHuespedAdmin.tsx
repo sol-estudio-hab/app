@@ -97,6 +97,38 @@ export default function DetalleHuespedAdmin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
+  // Recarga solo lo relacionado con acuerdos (usada por reactivar/crear
+  // acuerdo). A diferencia de cargar(), NO pisa nombres/habitación/WhatsApp
+  // del huésped por si el admin tiene cambios sin guardar en ese formulario.
+  async function cargarAcuerdos() {
+    if (!id) return
+    const supabase = getSupabase()
+    const acuerdosRes = await supabase
+      .from('acuerdos')
+      .select('*')
+      .eq('huesped_id', id)
+      .order('creado_en', { ascending: false })
+    const todosLosAcuerdos = (acuerdosRes.data as Acuerdo[]) ?? []
+    const a = todosLosAcuerdos.find((x) => x.estado === 'activo') ?? null
+    setAcuerdo(a)
+    setHistorialAcuerdos(todosLosAcuerdos.filter((x) => x.id !== a?.id))
+    setActivo(true)
+    if (a) {
+      setFechaIngreso(a.fecha_ingreso)
+      setMesesAcuerdo(String(a.meses_acuerdo))
+      setDepositoPagoUnico(a.deposito_pago_unico)
+      const [pagosRes, depositosRes] = await Promise.all([
+        supabase.from('pagos').select('*').eq('acuerdo_id', a.id),
+        supabase.from('depositos').select('*').eq('acuerdo_id', a.id),
+      ])
+      setPagos((pagosRes.data as Pago[]) ?? [])
+      setDepositos((depositosRes.data as Deposito[]) ?? [])
+    } else {
+      setPagos([])
+      setDepositos([])
+    }
+  }
+
   async function guardarHuesped() {
     if (!huesped) return
     setError(null)
@@ -184,7 +216,7 @@ export default function DetalleHuespedAdmin() {
       return
     }
     setReactivandoId(null)
-    await cargar()
+    await cargarAcuerdos()
   }
 
   async function crearNuevoAcuerdo() {
@@ -220,7 +252,7 @@ export default function DetalleHuespedAdmin() {
     setMostrandoNuevoAcuerdo(false)
     setFechaIngresoNuevo('')
     setMesesAcuerdoNuevo('')
-    await cargar()
+    await cargarAcuerdos()
   }
 
   async function verComprobante(archivoUrl: string) {
