@@ -10,6 +10,7 @@ export default function DetalleHuespedAdmin() {
   const { id } = useParams<{ id: string }>()
   const [huesped, setHuesped] = useState<Huesped | null>(null)
   const [acuerdo, setAcuerdo] = useState<Acuerdo | null>(null)
+  const [historialAcuerdos, setHistorialAcuerdos] = useState<Acuerdo[]>([])
   const [pagos, setPagos] = useState<Pago[]>([])
   const [depositos, setDepositos] = useState<Deposito[]>([])
   const [contratos, setContratos] = useState<Contrato[]>([])
@@ -17,6 +18,15 @@ export default function DetalleHuespedAdmin() {
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [subiendoContrato, setSubiendoContrato] = useState(false)
+  const [guardandoAcuerdo, setGuardandoAcuerdo] = useState(false)
+
+  const [reactivandoId, setReactivandoId] = useState<string | null>(null)
+  const [fechaIngresoReactivar, setFechaIngresoReactivar] = useState('')
+  const [mesesAcuerdoReactivar, setMesesAcuerdoReactivar] = useState('')
+
+  const [mostrandoNuevoAcuerdo, setMostrandoNuevoAcuerdo] = useState(false)
+  const [fechaIngresoNuevo, setFechaIngresoNuevo] = useState('')
+  const [mesesAcuerdoNuevo, setMesesAcuerdoNuevo] = useState('')
 
   const [nombres, setNombres] = useState('')
   const [numeroHabitacion, setNumeroHabitacion] = useState('')
@@ -34,14 +44,13 @@ export default function DetalleHuespedAdmin() {
   async function cargar() {
     if (!id) return
     const supabase = getSupabase()
-    const [huespedRes, acuerdoRes] = await Promise.all([
+    const [huespedRes, acuerdosRes] = await Promise.all([
       supabase.from('huespedes').select('*').eq('id', id).maybeSingle(),
       supabase
         .from('acuerdos')
         .select('*')
         .eq('huesped_id', id)
-        .eq('estado', 'activo')
-        .maybeSingle(),
+        .order('creado_en', { ascending: false }),
     ])
     if (huespedRes.error) {
       setError(huespedRes.error.message)
@@ -49,9 +58,11 @@ export default function DetalleHuespedAdmin() {
       return
     }
     const h = huespedRes.data as Huesped | null
-    const a = acuerdoRes.data as Acuerdo | null
+    const todosLosAcuerdos = (acuerdosRes.data as Acuerdo[]) ?? []
+    const a = todosLosAcuerdos.find((x) => x.estado === 'activo') ?? null
     setHuesped(h)
     setAcuerdo(a)
+    setHistorialAcuerdos(todosLosAcuerdos.filter((x) => x.id !== a?.id))
     if (h) {
       setNombres(h.nombres)
       setNumeroHabitacion(h.numero_habitacion)
@@ -128,6 +139,87 @@ export default function DetalleHuespedAdmin() {
       setError('No se pudieron guardar los cambios.')
       return
     }
+    await cargar()
+  }
+
+  function iniciarReactivacion(acuerdoAReactivar: Acuerdo) {
+    setError(null)
+    setMostrandoNuevoAcuerdo(false)
+    setReactivandoId(acuerdoAReactivar.id)
+    setFechaIngresoReactivar(acuerdoAReactivar.fecha_ingreso)
+    setMesesAcuerdoReactivar(String(acuerdoAReactivar.meses_acuerdo))
+  }
+
+  async function confirmarReactivacion(acuerdoAReactivar: Acuerdo) {
+    if (!huesped) return
+    setError(null)
+    const meses = Number(mesesAcuerdoReactivar)
+    if (!fechaIngresoReactivar) {
+      setError('La fecha de ingreso es obligatoria.')
+      return
+    }
+    if (!Number.isInteger(meses) || meses <= 0) {
+      setError('El número de meses del acuerdo debe ser un entero mayor a 0.')
+      return
+    }
+
+    setGuardandoAcuerdo(true)
+    const supabase = getSupabase()
+    const { error: errorAcuerdo } = await supabase
+      .from('acuerdos')
+      .update({
+        estado: 'activo',
+        fecha_ingreso: fechaIngresoReactivar,
+        meses_acuerdo: meses,
+      })
+      .eq('id', acuerdoAReactivar.id)
+    const { error: errorHuesped } = await supabase
+      .from('huespedes')
+      .update({ activo: true })
+      .eq('id', huesped.id)
+
+    setGuardandoAcuerdo(false)
+    if (errorAcuerdo || errorHuesped) {
+      setError('No se pudo reactivar el acuerdo.')
+      return
+    }
+    setReactivandoId(null)
+    await cargar()
+  }
+
+  async function crearNuevoAcuerdo() {
+    if (!huesped) return
+    setError(null)
+    const meses = Number(mesesAcuerdoNuevo)
+    if (!fechaIngresoNuevo) {
+      setError('La fecha de ingreso es obligatoria.')
+      return
+    }
+    if (!Number.isInteger(meses) || meses <= 0) {
+      setError('El número de meses del acuerdo debe ser un entero mayor a 0.')
+      return
+    }
+
+    setGuardandoAcuerdo(true)
+    const supabase = getSupabase()
+    const { error: errorInsertar } = await supabase.from('acuerdos').insert({
+      huesped_id: huesped.id,
+      fecha_ingreso: fechaIngresoNuevo,
+      meses_acuerdo: meses,
+    })
+    const { error: errorHuesped } = await supabase
+      .from('huespedes')
+      .update({ activo: true })
+      .eq('id', huesped.id)
+
+    setGuardandoAcuerdo(false)
+    if (errorInsertar || errorHuesped) {
+      setError('No se pudo crear el nuevo acuerdo.')
+      return
+    }
+    setMostrandoNuevoAcuerdo(false)
+    setFechaIngresoNuevo('')
+    setMesesAcuerdoNuevo('')
     await cargar()
   }
 
@@ -570,7 +662,150 @@ export default function DetalleHuespedAdmin() {
           })}
         </div>
       ) : (
-        <p className="mt-6 text-slate-600">Este huésped no tiene un acuerdo activo.</p>
+        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-slate-600">Este huésped no tiene un acuerdo activo.</p>
+
+          {historialAcuerdos.length > 0 && (
+            <div className="mt-4 flex flex-col gap-3">
+              <h2 className="font-semibold text-slate-900">Acuerdos anteriores</h2>
+              {historialAcuerdos.map((a) => (
+                <div key={a.id} className="rounded-lg border border-slate-200 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm text-slate-700">
+                      <p>
+                        Desde el {new Date(`${a.fecha_ingreso}T00:00:00`).toLocaleDateString('es')}
+                        {' · '}
+                        {a.meses_acuerdo} {a.meses_acuerdo === 1 ? 'mes' : 'meses'}
+                        {' · '}
+                        <span className="capitalize">{a.estado}</span>
+                      </p>
+                    </div>
+                    {reactivandoId !== a.id && (
+                      <button
+                        type="button"
+                        onClick={() => iniciarReactivacion(a)}
+                        className="rounded-lg border border-marca-700 px-3 py-1.5 text-sm font-semibold text-marca-700 hover:bg-marca-50"
+                      >
+                        Corregir y reactivar
+                      </button>
+                    )}
+                  </div>
+
+                  {reactivandoId === a.id && (
+                    <div className="mt-3 flex flex-col gap-3 border-t border-slate-200 pt-3">
+                      <p className="text-xs text-slate-500">
+                        Usa esto cuando el acuerdo terminó por un dato mal ingresado (por ejemplo,
+                        menos meses de los firmados). Ajusta lo que haga falta y reactívalo — es el
+                        mismo acuerdo, no uno nuevo.
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                          Fecha de ingreso
+                          <input
+                            type="date"
+                            value={fechaIngresoReactivar}
+                            onChange={(e) => setFechaIngresoReactivar(e.target.value)}
+                            className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                          Meses del acuerdo
+                          <input
+                            type="number"
+                            min={1}
+                            value={mesesAcuerdoReactivar}
+                            onChange={(e) => setMesesAcuerdoReactivar(e.target.value)}
+                            className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+                          />
+                        </label>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => confirmarReactivacion(a)}
+                          disabled={guardandoAcuerdo}
+                          className="rounded-lg bg-marca-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-800 disabled:opacity-60"
+                        >
+                          {guardandoAcuerdo ? 'Guardando…' : 'Guardar y reactivar'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReactivandoId(null)}
+                          disabled={guardandoAcuerdo}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            {!mostrandoNuevoAcuerdo ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null)
+                  setReactivandoId(null)
+                  setMostrandoNuevoAcuerdo(true)
+                }}
+                className="rounded-lg bg-marca-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-800"
+              >
+                Crear nuevo acuerdo
+              </button>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <p className="text-xs text-slate-500">
+                  Usa esto cuando el acuerdo anterior terminó correctamente y el huésped renueva —
+                  se guarda como un acuerdo nuevo, sin perder el historial del anterior.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                    Fecha de ingreso
+                    <input
+                      type="date"
+                      value={fechaIngresoNuevo}
+                      onChange={(e) => setFechaIngresoNuevo(e.target.value)}
+                      className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                    Meses del acuerdo
+                    <input
+                      type="number"
+                      min={1}
+                      value={mesesAcuerdoNuevo}
+                      onChange={(e) => setMesesAcuerdoNuevo(e.target.value)}
+                      className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+                    />
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={crearNuevoAcuerdo}
+                    disabled={guardandoAcuerdo}
+                    className="rounded-lg bg-marca-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-800 disabled:opacity-60"
+                  >
+                    {guardandoAcuerdo ? 'Creando…' : 'Crear acuerdo'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMostrandoNuevoAcuerdo(false)}
+                    disabled={guardandoAcuerdo}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </section>
   )

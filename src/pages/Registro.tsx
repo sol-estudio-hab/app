@@ -1,7 +1,9 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Campo from '../components/Campo'
 import { useAuth } from '../context/AuthContext'
+import { HABITACIONES } from '../lib/habitaciones'
+import { getSupabase } from '../lib/supabase'
 
 export default function Registro() {
   const { registrarse } = useAuth()
@@ -11,6 +13,8 @@ export default function Registro() {
   const [confirmarContrasena, setConfirmarContrasena] = useState('')
   const [nombres, setNombres] = useState('')
   const [numeroHabitacion, setNumeroHabitacion] = useState('')
+  const [habitacionesDisponibles, setHabitacionesDisponibles] = useState<string[]>([])
+  const [cargandoHabitaciones, setCargandoHabitaciones] = useState(true)
   const [fechaIngreso, setFechaIngreso] = useState('')
   const [mesesAcuerdo, setMesesAcuerdo] = useState('')
   const [numeroWhatsapp, setNumeroWhatsapp] = useState('')
@@ -18,6 +22,16 @@ export default function Registro() {
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false)
+
+  useEffect(() => {
+    getSupabase()
+      .rpc('habitaciones_ocupadas')
+      .then(({ data, error }) => {
+        const ocupadas = new Set(error ? [] : ((data as string[] | null) ?? []))
+        setHabitacionesDisponibles(HABITACIONES.filter((h) => !ocupadas.has(h)))
+        setCargandoHabitaciones(false)
+      })
+  }, [])
 
   function validar(): string | null {
     if (
@@ -114,12 +128,29 @@ export default function Registro() {
           autoComplete="new-password"
         />
         <Campo etiqueta="Nombres" tipo="text" valor={nombres} onCambio={setNombres} />
-        <Campo
-          etiqueta="Número de habitación"
-          tipo="text"
-          valor={numeroHabitacion}
-          onCambio={setNumeroHabitacion}
-        />
+        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+          Número de habitación
+          <select
+            required
+            value={numeroHabitacion}
+            onChange={(e) => setNumeroHabitacion(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-2 font-normal text-slate-900 focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+          >
+            <option value="">
+              {cargandoHabitaciones ? 'Cargando habitaciones…' : 'Selecciona una habitación'}
+            </option>
+            {habitacionesDisponibles.map((h) => (
+              <option key={h} value={h}>
+                {h}
+              </option>
+            ))}
+          </select>
+          {!cargandoHabitaciones && habitacionesDisponibles.length === 0 && (
+            <span className="text-xs text-red-600">
+              No hay habitaciones disponibles en este momento. Contacta al administrador.
+            </span>
+          )}
+        </label>
         <Campo
           etiqueta="Fecha de ingreso (igual a la del acuerdo firmado)"
           tipo="date"

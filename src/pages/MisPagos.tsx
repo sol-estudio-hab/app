@@ -3,17 +3,26 @@ import EstadoPagoBadge from '../components/EstadoPagoBadge'
 import { useAuth } from '../context/AuthContext'
 import { TAMANO_MAXIMO_BYTES, TIPOS_PERMITIDOS, extensionParaMime } from '../lib/archivos'
 import { estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from '../lib/calendario'
+import { HABITACIONES } from '../lib/habitaciones'
 import { getSupabase } from '../lib/supabase'
 import type { Deposito, Pago } from '../types/dominio'
 
 export default function MisPagos() {
-  const { huesped, acuerdoActivo } = useAuth()
+  const { huesped, acuerdoActivo, recargarPerfil } = useAuth()
   const [pagos, setPagos] = useState<Pago[]>([])
   const [depositos, setDepositos] = useState<Deposito[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [subiendoMes, setSubiendoMes] = useState<string | null>(null)
   const [subiendoCargue, setSubiendoCargue] = useState<1 | 2 | null>(null)
+
+  const [numeroHabitacionNuevo, setNumeroHabitacionNuevo] = useState('')
+  const [fechaIngresoNuevo, setFechaIngresoNuevo] = useState('')
+  const [mesesAcuerdoNuevo, setMesesAcuerdoNuevo] = useState('')
+  const [creandoAcuerdo, setCreandoAcuerdo] = useState(false)
+  const [errorNuevoAcuerdo, setErrorNuevoAcuerdo] = useState<string | null>(null)
+  const [habitacionesDisponibles, setHabitacionesDisponibles] = useState<string[]>([])
+  const [cargandoHabitaciones, setCargandoHabitaciones] = useState(true)
 
   async function cargarPagos() {
     if (!acuerdoActivo) return
@@ -33,13 +42,144 @@ export default function MisPagos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acuerdoActivo?.id])
 
-  if (!acuerdoActivo || !huesped) {
+  useEffect(() => {
+    if (acuerdoActivo || !huesped) return
+    let cancelado = false
+    setCargandoHabitaciones(true)
+    getSupabase()
+      .rpc('habitaciones_ocupadas')
+      .then(({ data, error: errorRpc }) => {
+        if (cancelado) return
+        const ocupadas = new Set(errorRpc ? [] : ((data as string[] | null) ?? []))
+        setHabitacionesDisponibles(HABITACIONES.filter((h) => !ocupadas.has(h)))
+        setCargandoHabitaciones(false)
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [acuerdoActivo, huesped])
+
+  async function crearNuevoAcuerdo() {
+    if (!huesped) return
+    setErrorNuevoAcuerdo(null)
+    if (!numeroHabitacionNuevo) {
+      setErrorNuevoAcuerdo('Selecciona una habitación.')
+      return
+    }
+    if (!fechaIngresoNuevo) {
+      setErrorNuevoAcuerdo('La fecha de ingreso es obligatoria.')
+      return
+    }
+    const meses = Number(mesesAcuerdoNuevo)
+    if (!Number.isInteger(meses) || meses <= 0) {
+      setErrorNuevoAcuerdo('El número de meses del acuerdo debe ser un entero mayor a 0.')
+      return
+    }
+
+    setCreandoAcuerdo(true)
+    const supabase = getSupabase()
+    const { error: errorHuesped } = await supabase
+      .from('huespedes')
+      .update({ numero_habitacion: numeroHabitacionNuevo, activo: true })
+      .eq('id', huesped.id)
+    if (errorHuesped) {
+      setCreandoAcuerdo(false)
+      setErrorNuevoAcuerdo('No se pudo guardar la habitación. Intenta de nuevo.')
+      return
+    }
+
+    const { error: errorInsertar } = await supabase.from('acuerdos').insert({
+      huesped_id: huesped.id,
+      fecha_ingreso: fechaIngresoNuevo,
+      meses_acuerdo: meses,
+    })
+    setCreandoAcuerdo(false)
+    if (errorInsertar) {
+      setErrorNuevoAcuerdo(
+        'No se pudo crear el nuevo acuerdo. Es posible que la habitación ya no esté disponible — elige otra e intenta de nuevo.',
+      )
+      return
+    }
+    setNumeroHabitacionNuevo('')
+    setFechaIngresoNuevo('')
+    setMesesAcuerdoNuevo('')
+    await recargarPerfil()
+  }
+
+  if (!huesped) {
     return (
       <section className="mx-auto max-w-md text-center">
         <h1 className="text-xl font-bold text-marca-900">Mis pagos</h1>
         <p className="mt-3 text-slate-600">
-          No tienes un acuerdo activo. Contacta al administrador.
+          Esta cuenta no tiene un perfil de huésped asociado.
         </p>
+      </section>
+    )
+  }
+
+  if (!acuerdoActivo) {
+    return (
+      <section className="mx-auto max-w-md">
+        <h1 className="text-center text-xl font-bold text-marca-900">Mis pagos</h1>
+        <p className="mt-3 text-center text-slate-600">
+          No tienes un acuerdo activo. Si vas a continuar tu estadía, ingresa los datos de tu
+          nuevo acuerdo.
+        </p>
+
+        <div className="mt-6 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4">
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Número de habitación
+            <select
+              value={numeroHabitacionNuevo}
+              onChange={(e) => setNumeroHabitacionNuevo(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+            >
+              <option value="">
+                {cargandoHabitaciones ? 'Cargando habitaciones…' : 'Selecciona una habitación'}
+              </option>
+              {habitacionesDisponibles.map((h) => (
+                <option key={h} value={h}>
+                  {h}
+                </option>
+              ))}
+            </select>
+            {!cargandoHabitaciones && habitacionesDisponibles.length === 0 && (
+              <span className="text-xs text-red-600">
+                No hay habitaciones disponibles en este momento. Contacta al administrador.
+              </span>
+            )}
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Fecha de ingreso (igual a la del nuevo acuerdo firmado)
+            <input
+              type="date"
+              value={fechaIngresoNuevo}
+              onChange={(e) => setFechaIngresoNuevo(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Número de meses del acuerdo
+            <input
+              type="number"
+              min={1}
+              value={mesesAcuerdoNuevo}
+              onChange={(e) => setMesesAcuerdoNuevo(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+            />
+          </label>
+
+          {errorNuevoAcuerdo && <p className="text-sm text-red-600">{errorNuevoAcuerdo}</p>}
+
+          <button
+            type="button"
+            onClick={crearNuevoAcuerdo}
+            disabled={creandoAcuerdo || cargandoHabitaciones || habitacionesDisponibles.length === 0}
+            className="rounded-lg bg-marca-700 px-4 py-2 font-semibold text-white shadow hover:bg-marca-800 disabled:opacity-60"
+          >
+            {creandoAcuerdo ? 'Creando…' : 'Crear nuevo acuerdo'}
+          </button>
+        </div>
       </section>
     )
   }

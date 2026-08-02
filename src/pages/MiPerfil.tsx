@@ -177,7 +177,11 @@ export default function MiPerfil() {
         </>
       ) : (
         <p className="mt-6 text-slate-600">
-          No tienes un acuerdo activo. Contacta al administrador para renovar.
+          No tienes un acuerdo activo.{' '}
+          <Link to="/pagos" className="text-marca-700 underline">
+            Ingresa los datos de tu nuevo acuerdo desde Mis pagos
+          </Link>
+          .
         </p>
       )}
 
