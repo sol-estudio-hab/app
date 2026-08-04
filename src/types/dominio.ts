@@ -20,6 +20,7 @@ export interface Acuerdo {
   estado: EstadoAcuerdo
   creado_en: string
   deposito_pago_unico: boolean
+  deposito_valor: number | null
 }
 
 export interface Pago {

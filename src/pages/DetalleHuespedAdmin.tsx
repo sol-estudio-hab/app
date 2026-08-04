@@ -35,6 +35,7 @@ export default function DetalleHuespedAdmin() {
   const [fechaIngreso, setFechaIngreso] = useState('')
   const [mesesAcuerdo, setMesesAcuerdo] = useState('')
   const [depositoPagoUnico, setDepositoPagoUnico] = useState(false)
+  const [depositoValor, setDepositoValor] = useState('')
 
   const [rechazandoMes, setRechazandoMes] = useState<string | null>(null)
   const [motivoRechazo, setMotivoRechazo] = useState('')
@@ -79,6 +80,7 @@ export default function DetalleHuespedAdmin() {
       setFechaIngreso(a.fecha_ingreso)
       setMesesAcuerdo(String(a.meses_acuerdo))
       setDepositoPagoUnico(a.deposito_pago_unico)
+      setDepositoValor(a.deposito_valor != null ? String(a.deposito_valor) : '')
       const [pagosRes, depositosRes] = await Promise.all([
         supabase.from('pagos').select('*').eq('acuerdo_id', a.id),
         supabase.from('depositos').select('*').eq('acuerdo_id', a.id),
@@ -117,6 +119,7 @@ export default function DetalleHuespedAdmin() {
       setFechaIngreso(a.fecha_ingreso)
       setMesesAcuerdo(String(a.meses_acuerdo))
       setDepositoPagoUnico(a.deposito_pago_unico)
+      setDepositoValor(a.deposito_valor != null ? String(a.deposito_valor) : '')
       const [pagosRes, depositosRes] = await Promise.all([
         supabase.from('pagos').select('*').eq('acuerdo_id', a.id),
         supabase.from('depositos').select('*').eq('acuerdo_id', a.id),
@@ -137,6 +140,10 @@ export default function DetalleHuespedAdmin() {
       const meses = Number(mesesAcuerdo)
       if (!Number.isInteger(meses) || meses <= 0) {
         setError('El número de meses del acuerdo debe ser un entero mayor a 0.')
+        return
+      }
+      if (depositoValor.trim() && (!Number.isInteger(Number(depositoValor)) || Number(depositoValor) < 0)) {
+        setError('El valor del depósito debe ser un número entero mayor o igual a 0.')
         return
       }
     }
@@ -161,6 +168,7 @@ export default function DetalleHuespedAdmin() {
           fecha_ingreso: fechaIngreso,
           meses_acuerdo: Number(mesesAcuerdo),
           deposito_pago_unico: depositoPagoUnico,
+          deposito_valor: depositoValor.trim() ? Number(depositoValor) : null,
         })
         .eq('id', acuerdo.id)
       errorAcuerdo = resultado.error?.message ?? null
@@ -537,7 +545,24 @@ export default function DetalleHuespedAdmin() {
         <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="font-semibold text-slate-900">Depósito de garantía</h2>
 
-          <label className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+          <label className="mt-2 flex flex-col gap-1 text-sm font-medium text-slate-700 sm:max-w-xs">
+            Valor real del depósito (COP)
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={depositoValor}
+              onChange={(e) => setDepositoValor(e.target.value)}
+              placeholder="Ej: 500000"
+              className="rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600"
+            />
+          </label>
+          <p className="mt-1 text-xs text-slate-500">
+            Regístralo manualmente cuando el comprobante cargado no refleje el valor real del
+            depósito (por ejemplo, si el huésped subió un pago mixto de arriendo + depósito).
+          </p>
+
+          <label className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-700">
             <input
               type="checkbox"
               checked={depositoPagoUnico}
@@ -545,7 +570,8 @@ export default function DetalleHuespedAdmin() {
             />
             El depósito se pagó completo en el cargue 1 (ocultar el cargue 2 al huésped)
           </label>
-          {depositoPagoUnico !== acuerdo.deposito_pago_unico && (
+          {(depositoPagoUnico !== acuerdo.deposito_pago_unico ||
+            depositoValor !== (acuerdo.deposito_valor != null ? String(acuerdo.deposito_valor) : '')) && (
             <p className="mt-1 text-xs text-amber-600">
               Recuerda hacer clic en &quot;Guardar cambios&quot; para aplicar este cambio.
             </p>
