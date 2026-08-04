@@ -112,20 +112,31 @@ temas): uno con el contrato adjunto, y otro con el **reglamento de convivencia**
 único para todos, que el admin sube/reemplaza desde el Panel administrador (tarjeta "Reglamento de
 convivencia"). Si todavía no se ha subido el reglamento, ese segundo correo simplemente se omite.
 
-1. **Desplegar la Edge Function:**
+El correo del contrato incluye un botón **"Confirmar que leí y acepto"**. Al hacer clic (sin
+necesidad de iniciar sesión), el huésped queda registrado como confirmado (`contratos.confirmado_leido`
+/ `confirmado_en`) y se les avisa por correo a **todos los administradores** registrados en la
+tabla `admins` (incluye `aguasclaras713@gmail.com`). Es idempotente: si el huésped hace clic de
+nuevo, no se reenvía el aviso, solo muestra la fecha en que ya había confirmado. El panel admin
+(detalle de huésped, sección "Contratos") muestra si cada contrato ya fue confirmado o no.
+
+1. **Desplegar las Edge Functions:**
 
    ```bash
    supabase functions deploy notificar-contrato-huesped
+   supabase functions deploy confirmar-contrato --no-verify-jwt
    ```
 
-   No necesita secrets nuevos — reutiliza `RESEND_API_KEY` y `CORREO_REMITENTE` ya configurados.
+   `--no-verify-jwt` es obligatorio en `confirmar-contrato`: es un enlace público que se abre
+   directo desde el correo, sin token de sesión de la app. Ninguna necesita secrets nuevos —
+   reutilizan `RESEND_API_KEY` y `CORREO_REMITENTE` ya configurados.
 
 2. En el dashboard de Supabase: **Database → Webhooks → Create a new hook**
    - Tabla: `contratos` · Evento: `Insert` · Tipo: `Supabase Edge Function`
    - Función: `notificar-contrato-huesped`
 
 Sin el webhook del paso 2, la carga de contratos sigue funcionando con normalidad (el admin y el
-huésped los ven igual en la app) — solo no se envía el correo automático.
+huésped los ven igual en la app) — solo no se envía el correo automático ni el botón de
+confirmación.
 
 ## Recordatorios, mora y aviso de basura por cron (Fase 4)
 

@@ -54,11 +54,18 @@ Deno.serve(async (req) => {
       .download(payload.record.archivo_url)
     if (errorDescarga || !archivoContrato) throw new Error('No se pudo leer el contrato cargado')
 
+    const urlConfirmacion = `${SUPABASE_URL}/functions/v1/confirmar-contrato?id=${payload.record.id}`
+    const botonConfirmacion = `<p style="margin-top:16px;">
+      <a href="${urlConfirmacion}" style="display:inline-block;background-color:#0f766e;color:#ffffff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Confirmar que leí y acepto</a>
+    </p>`
+
     const enviadoContrato = await enviarCorreo({
       to: [huesped.correo],
       subject: 'Tu contrato de arriendo — Sol Estudio Hab',
       html: `<p>Hola ${huesped.nombres},</p>
-             <p>Adjuntamos tu contrato de arriendo. Guárdalo para tus registros.</p>`,
+             <p>Adjuntamos tu contrato de arriendo. Guárdalo para tus registros.</p>
+             <p>Por favor confirma que lo leíste y lo aceptas haciendo clic en el siguiente botón:</p>
+             ${botonConfirmacion}`,
       attachments: [
         { filename: payload.record.nombre_archivo, content: bufferABase64(await archivoContrato.arrayBuffer()) },
       ],

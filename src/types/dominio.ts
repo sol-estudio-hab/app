@@ -54,6 +54,8 @@ export interface Contrato {
   nombre_archivo: string
   subido_por: string
   creado_en: string
+  confirmado_leido: boolean
+  confirmado_en: string | null
 }
 
 export type TipoNotificacion = 'recordatorio' | 'mora' | 'confirmacion' | 'fin_acuerdo' | 'aviso_basura'

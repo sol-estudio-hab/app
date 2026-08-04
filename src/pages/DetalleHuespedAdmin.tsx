@@ -510,7 +510,9 @@ export default function DetalleHuespedAdmin() {
         </div>
         <p className="mt-1 text-xs text-slate-500">
           Al cargar un contrato se le avisa automáticamente al huésped por correo, con el
-          contrato adjunto y el reglamento de convivencia en un correo aparte.
+          contrato adjunto y el reglamento de convivencia en un correo aparte. El correo incluye un
+          botón para que confirme que lo leyó y lo acepta; cuando lo confirma, te llega un aviso a
+          tu correo de administrador.
         </p>
 
         {contratos.length === 0 ? (
@@ -527,6 +529,14 @@ export default function DetalleHuespedAdmin() {
                   <p className="text-xs text-slate-500">
                     Cargado el {new Date(contrato.creado_en).toLocaleDateString('es')}
                   </p>
+                  {contrato.confirmado_leido ? (
+                    <p className="text-xs font-medium text-emerald-600">
+                      Confirmado por el huésped el{' '}
+                      {contrato.confirmado_en && new Date(contrato.confirmado_en).toLocaleDateString('es')}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600">Aún no confirmado por el huésped</p>
+                  )}
                 </div>
                 <button
                   type="button"
