@@ -62,18 +62,27 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-  const { data: huespedes, error } = await supabase
-    .from('huespedes')
-    .select('id, correo, numero_whatsapp')
-    .eq('activo', true)
+  // Se filtra por acuerdo activo (no solo huespedes.activo): son dos campos
+  // independientes — un admin puede destildar "Cuenta activa" sin finalizar
+  // el acuerdo, o viceversa — y lo que define a quién avisar es quién tiene
+  // un acuerdo de convivencia vigente.
+  const { data: acuerdosData, error } = await supabase
+    .from('acuerdos')
+    .select('huespedes!inner(id, correo, numero_whatsapp, activo)')
+    .eq('estado', 'activo')
+    .eq('huespedes.activo', true)
 
   if (error) {
     console.error(error)
     return new Response(JSON.stringify({ error: error.message }), { status: 500 })
   }
 
+  const huespedes = ((acuerdosData ?? []) as unknown as { huespedes: { id: string; correo: string; numero_whatsapp: string | null } }[]).map(
+    (a) => a.huespedes,
+  )
+
   let enviados = 0
-  for (const huesped of huespedes ?? []) {
+  for (const huesped of huespedes) {
     await supabase
       .from('notificaciones')
       .insert({ huesped_id: huesped.id, tipo: 'aviso_basura', canal: 'app', mes_referencia: null })
