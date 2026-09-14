@@ -45,3 +45,40 @@ export function sumarDias(fecha: Date, dias: number): Date {
   resultado.setDate(resultado.getDate() + dias)
   return resultado
 }
+
+export type EstadoMes = 'verificado' | 'en_revision' | 'rechazado' | 'pendiente' | 'vencido'
+
+interface PagoEstado {
+  estado: string
+}
+
+/** Réplica de estadoDelMes en src/lib/calendario.ts. */
+export function estadoDelMes(vencimiento: Date, pago: PagoEstado | undefined, hoy = new Date()): EstadoMes {
+  if (pago?.estado === 'verificado') return 'verificado'
+  if (pago?.estado === 'cargado') return 'en_revision'
+  if (pago?.estado === 'rechazado') return 'rechazado'
+  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+  const vencimientoSinHora = new Date(
+    vencimiento.getFullYear(),
+    vencimiento.getMonth(),
+    vencimiento.getDate(),
+  )
+  return hoySinHora > vencimientoSinHora ? 'vencido' : 'pendiente'
+}
+
+/**
+ * Réplica de estadoActualAcuerdo en src/lib/calendario.ts: primer mes sin verificar en
+ * orden cronológico, para que un mes anterior vencido no se "olvide" al empezar un mes
+ * nuevo.
+ */
+export function estadoActualAcuerdo(
+  meses: MesAcuerdo[],
+  pagoDeMes: (mes: string) => PagoEstado | undefined,
+  hoy = new Date(),
+): EstadoMes | null {
+  for (const m of meses) {
+    const estado = estadoDelMes(m.vencimiento, pagoDeMes(m.mes), hoy)
+    if (estado !== 'verificado') return estado
+  }
+  return meses.length > 0 ? 'verificado' : null
+}

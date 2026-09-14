@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from './calendario'
+import { estadoActualAcuerdo, estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from './calendario'
 import type { Pago } from '../types/dominio'
 
 function pago(estado: Pago['estado']): Pago {
@@ -84,6 +84,53 @@ describe('estadoDelMes', () => {
 
   it('un día después del vencimiento ya es "vencido"', () => {
     expect(estadoDelMes(new Date(2026, 6, 16), undefined, hoy)).toBe('vencido')
+  })
+})
+
+describe('estadoActualAcuerdo', () => {
+  const hoy = new Date(2026, 6, 17) // 17 de julio de 2026
+
+  function pagoDeMap(pagos: Record<string, Pago | undefined>) {
+    return (mes: string) => pagos[mes]
+  }
+
+  it('devuelve null si el acuerdo no tiene meses', () => {
+    expect(estadoActualAcuerdo([], pagoDeMap({}), hoy)).toBeNull()
+  })
+
+  it('devuelve "verificado" si todos los meses están verificados', () => {
+    const meses = [
+      { mes: '2026-05', vencimiento: new Date(2026, 4, 1) },
+      { mes: '2026-06', vencimiento: new Date(2026, 5, 1) },
+    ]
+    const pagos = { '2026-05': pago('verificado'), '2026-06': pago('verificado') }
+    expect(estadoActualAcuerdo(meses, pagoDeMap(pagos), hoy)).toBe('verificado')
+  })
+
+  it('sin mora previa, refleja el estado normal del mes actual ("pendiente")', () => {
+    const meses = [
+      { mes: '2026-06', vencimiento: new Date(2026, 5, 1) },
+      { mes: '2026-07', vencimiento: new Date(2026, 6, 20) },
+    ]
+    const pagos = { '2026-06': pago('verificado') }
+    expect(estadoActualAcuerdo(meses, pagoDeMap(pagos), hoy)).toBe('pendiente')
+  })
+
+  it('mantiene "vencido" del mes anterior en vez de volver a "pendiente" al empezar el mes nuevo', () => {
+    const meses = [
+      { mes: '2026-06', vencimiento: new Date(2026, 5, 1) }, // sin pago, ya vencido
+      { mes: '2026-07', vencimiento: new Date(2026, 6, 20) }, // aún no vence
+    ]
+    expect(estadoActualAcuerdo(meses, pagoDeMap({}), hoy)).toBe('vencido')
+  })
+
+  it('respeta un mes "en_revision" anterior aunque el mes actual esté pendiente', () => {
+    const meses = [
+      { mes: '2026-06', vencimiento: new Date(2026, 5, 1) },
+      { mes: '2026-07', vencimiento: new Date(2026, 6, 20) },
+    ]
+    const pagos = { '2026-06': pago('cargado') }
+    expect(estadoActualAcuerdo(meses, pagoDeMap(pagos), hoy)).toBe('en_revision')
   })
 })
 

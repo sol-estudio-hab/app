@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import EstadoPagoBadge from '../components/EstadoPagoBadge'
 import { TAMANO_MAXIMO_BYTES } from '../lib/archivos'
-import { estadoDelMes, generarMesesAcuerdo, type EstadoMes } from '../lib/calendario'
+import { estadoActualAcuerdo, generarMesesAcuerdo, type EstadoMes } from '../lib/calendario'
 import { getSupabase } from '../lib/supabase'
 import type { Acuerdo, Huesped, Pago } from '../types/dominio'
 
@@ -11,10 +11,6 @@ const RUTA_REGLAMENTO = 'reglamento/reglamento-convivencia.pdf'
 interface FilaHuesped {
   huesped: Huesped
   estadoMesActual: EstadoMes | null
-}
-
-function mesActualComoTexto(hoy: Date): string {
-  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
 }
 
 export default function PanelAdmin() {
@@ -64,17 +60,14 @@ export default function PanelAdmin() {
         : { data: [] as Pago[] }
       const pagos = (pagosRes.data as Pago[]) ?? []
 
-      const hoy = new Date()
-      const mesActual = mesActualComoTexto(hoy)
-
       const filasCalculadas = huespedes.map((huesped) => {
         const acuerdo = acuerdoPorHuesped.get(huesped.id)
         if (!acuerdo) return { huesped, estadoMesActual: null }
         const meses = generarMesesAcuerdo(acuerdo.fecha_ingreso, acuerdo.meses_acuerdo)
-        const mesInfo = meses.find((m) => m.mes === mesActual)
-        if (!mesInfo) return { huesped, estadoMesActual: null }
-        const pago = pagos.find((p) => p.acuerdo_id === acuerdo.id && p.mes_pagado === mesActual)
-        return { huesped, estadoMesActual: estadoDelMes(mesInfo.vencimiento, pago) }
+        const estadoMesActual = estadoActualAcuerdo(meses, (mes) =>
+          pagos.find((p) => p.acuerdo_id === acuerdo.id && p.mes_pagado === mes),
+        )
+        return { huesped, estadoMesActual }
       })
 
       setFilas(filasCalculadas)
@@ -85,7 +78,10 @@ export default function PanelAdmin() {
   return (
     <section>
       <h1 className="text-xl font-bold text-marca-900">Panel administrador</h1>
-      <p className="mt-1 text-sm text-slate-600">Estado de pago del mes actual por huésped.</p>
+      <p className="mt-1 text-sm text-slate-600">
+        Estado de pago por huésped (si un mes anterior quedó vencido, se sigue mostrando "Vencido"
+        hasta que se regularice, aunque ya haya empezado un mes nuevo).
+      </p>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
@@ -122,7 +118,7 @@ export default function PanelAdmin() {
                 <th className="px-4 py-2">Nombres</th>
                 <th className="px-4 py-2">Correo</th>
                 <th className="px-4 py-2">Cuenta</th>
-                <th className="px-4 py-2">Mes actual</th>
+                <th className="px-4 py-2">Estado de pago</th>
                 <th className="px-4 py-2" />
               </tr>
             </thead>

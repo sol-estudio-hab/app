@@ -228,6 +228,53 @@ select cron.schedule(
 El archivo [0006_cron_jobs.sql](supabase/migrations/0006_cron_jobs.sql) trae la misma programación
 con marcadores — no lo pegues tal cual sin reemplazarlos primero.
 
+## Resumen de mora para el administrador (control cada 2 días)
+
+**[cron-resumen-mora-admin](supabase/functions/cron-resumen-mora-admin)** le envía por correo a
+**todos los administradores** (tabla `admins`) una tabla de control cada 2 días con los huéspedes
+en mora: habitación, nombre, y el mes/fecha de su **último pago cargado** en el sistema (para ver
+de un vistazo hace cuánto no suben comprobante). Si nadie está en mora, igual llega el correo
+confirmando eso — la cadencia fija sirve para saber que el cron sigue corriendo.
+
+"En mora" usa la misma regla que la columna "Estado de pago" del panel admin: si un mes anterior
+quedó vencido, sigue contando como mora aunque ya haya empezado un mes nuevo (no se resetea a
+"pendiente" solo por cambiar de mes).
+
+### Desplegar
+
+```bash
+supabase functions deploy cron-resumen-mora-admin
+```
+
+No necesita secrets nuevos — reutiliza `CRON_SECRET`, `RESEND_API_KEY` y `CORREO_REMITENTE` ya
+configurados para los otros cron jobs.
+
+### Programar (cada 2 días, 8:00 a.m. Colombia)
+
+En el SQL Editor (reemplazando `<project-ref>`, `<anon-key>` y `<cron-secret>` por los valores
+reales, igual que los otros cron jobs):
+
+```sql
+select cron.schedule(
+  'resumen-mora-admin-cada-2-dias',
+  '0 13 */2 * *',
+  $$
+  select net.http_post(
+    url := 'https://<project-ref>.supabase.co/functions/v1/cron-resumen-mora-admin',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer <anon-key>',
+      'x-cron-secret', '<cron-secret>'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+El archivo [0015_cron_resumen_mora.sql](supabase/migrations/0015_cron_resumen_mora.sql) trae esta
+misma programación con marcadores.
+
 ## Avisos por WhatsApp (opcional)
 
 Además de correo y push, `cron-aviso-basura` y `cron-recordatorios-pago` (a los +10 días) pueden
