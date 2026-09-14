@@ -22,6 +22,8 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const CRON_SECRET = Deno.env.get('CRON_SECRET')!
 const ZONA_HORARIA = 'America/Bogota'
+// Habitación 301 es la cuenta de pruebas: se excluye del resumen de mora al admin.
+const HABITACION_PRUEBA = '301'
 
 interface Acuerdo {
   id: string
@@ -93,6 +95,7 @@ Deno.serve(async (req) => {
         return { acuerdo, estado }
       })
       .filter((f) => f.estado === 'vencido')
+      .filter((f) => f.acuerdo.huespedes.numero_habitacion !== HABITACION_PRUEBA)
       .map(({ acuerdo }) => {
         const ultimo = ultimoPagoCargado(acuerdo.id, pagos)
         return {
