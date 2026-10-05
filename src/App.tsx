@@ -8,6 +8,7 @@ import Ingresar from './pages/Ingresar'
 import MiPerfil from './pages/MiPerfil'
 import MisPagos from './pages/MisPagos'
 import NoEncontrado from './pages/NoEncontrado'
+import NuevoHuespedAdmin from './pages/NuevoHuespedAdmin'
 import Notificaciones from './pages/Notificaciones'
 import PanelAdmin from './pages/PanelAdmin'
 import RecuperarContrasena from './pages/RecuperarContrasena'
@@ -31,6 +32,7 @@ export default function App() {
         </Route>
         <Route element={<RutaAdmin />}>
           <Route path="admin" element={<PanelAdmin />} />
+          <Route path="admin/huespedes/nuevo" element={<NuevoHuespedAdmin />} />
           <Route path="admin/huespedes/:id" element={<DetalleHuespedAdmin />} />
           <Route path="admin/reportes" element={<Reportes />} />
         </Route>

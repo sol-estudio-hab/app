@@ -43,6 +43,9 @@ export default function Layout() {
           <Link to="/admin" className="hover:underline">
             Panel admin
           </Link>
+          <Link to="/admin/huespedes/nuevo" className="hover:underline">
+            Nuevo huésped
+          </Link>
           <Link to="/admin/reportes" className="hover:underline">
             Reportes
           </Link>

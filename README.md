@@ -138,6 +138,24 @@ Sin el webhook del paso 2, la carga de contratos sigue funcionando con normalida
 huésped los ven igual en la app) — solo no se envía el correo automático ni el botón de
 confirmación.
 
+## Crear un huésped desde el admin
+
+Opción **Nuevo huésped** del menú del admin (`/admin/huespedes/nuevo`) para dar de alta a quien no
+se registró por su cuenta y que igual le lleguen recordatorios, avisos y alertas (correo y, si tiene
+número, WhatsApp; el push solo funciona cuando el huésped inicia sesión y lo activa). Pide correo,
+nombres, habitación libre, fecha de ingreso, meses del acuerdo y WhatsApp (opcional), y puede enviarle
+un correo para que establezca su contraseña.
+
+La Edge Function [crear-huesped-admin](supabase/functions/crear-huesped-admin) crea el usuario
+(confirmado, con contraseña aleatoria) y el alta automática crea huésped + acuerdo. Solo responde a
+administradores (comprueba la tabla `admins`). Se despliega **con** verificación de JWT (por defecto):
+
+```bash
+supabase functions deploy crear-huesped-admin
+```
+
+No necesita secrets nuevos — reutiliza `RESEND_API_KEY` y `CORREO_REMITENTE`.
+
 ## Archivar huéspedes
 
 Cuando un huésped se retira antes de tiempo, el admin usa **Archivar** en el detalle del huésped
