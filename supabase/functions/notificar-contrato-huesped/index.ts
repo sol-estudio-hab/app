@@ -44,10 +44,14 @@ Deno.serve(async (req) => {
 
     const { data: huesped, error: errorHuesped } = await supabase
       .from('huespedes')
-      .select('correo, nombres')
+      .select('correo, nombres, archivado')
       .eq('id', payload.record.huesped_id)
       .single()
     if (errorHuesped || !huesped) throw new Error('Huésped no encontrado')
+    // Un huésped archivado no recibe correos.
+    if (huesped.archivado) {
+      return new Response(JSON.stringify({ omitido: 'huesped archivado' }), { status: 200 })
+    }
 
     const { data: archivoContrato, error: errorDescarga } = await supabase.storage
       .from('contratos')

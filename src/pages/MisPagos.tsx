@@ -43,7 +43,7 @@ export default function MisPagos() {
   }, [acuerdoActivo?.id])
 
   useEffect(() => {
-    if (acuerdoActivo || !huesped) return
+    if (acuerdoActivo || !huesped || huesped.archivado) return
     let cancelado = false
     setCargandoHabitaciones(true)
     getSupabase()
@@ -112,6 +112,18 @@ export default function MisPagos() {
         <h1 className="text-xl font-bold text-marca-900">Mis pagos</h1>
         <p className="mt-3 text-slate-600">
           Esta cuenta no tiene un perfil de huésped asociado.
+        </p>
+      </section>
+    )
+  }
+
+  if (!acuerdoActivo && huesped.archivado) {
+    return (
+      <section className="mx-auto max-w-md text-center">
+        <h1 className="text-xl font-bold text-marca-900">Mis pagos</h1>
+        <p className="mt-3 text-slate-600">
+          Tu cuenta fue archivada porque tu estadía finalizó. Si quieres volver a Sol Estudio Hab,
+          contacta al administrador.
         </p>
       </section>
     )
@@ -251,8 +263,64 @@ export default function MisPagos() {
         })
 
     if (errorGuardar) setError('No se pudo registrar el pago.')
+    else if (pagoExistente?.archivo_url && pagoExistente.archivo_url !== ruta) {
+      // El archivo anterior tenía otra extensión: ya no lo referencia nadie.
+      await supabase.storage.from('comprobantes').remove([pagoExistente.archivo_url])
+    }
 
     setSubiendoMes(null)
+    await cargarPagos()
+  }
+
+  async function eliminarComprobante(pago: Pago) {
+    setError(null)
+    if (
+      !window.confirm(
+        'Se eliminará el comprobante de este mes y podrás cargar uno nuevo. ¿Deseas continuar?',
+      )
+    ) {
+      return
+    }
+    setSubiendoMes(pago.mes_pagado)
+    const supabase = getSupabase()
+    // RLS no devuelve error cuando no borra nada (p. ej. si ya está verificado),
+    // por eso se pide la fila borrada de vuelta para confirmar que sí se borró.
+    const { data: borradas, error: errorBorrar } = await supabase
+      .from('pagos')
+      .delete()
+      .eq('id', pago.id)
+      .select('id')
+    if (errorBorrar || !borradas?.length) {
+      setError('No se pudo eliminar el comprobante. Si ya fue verificado, ya no se puede eliminar.')
+    } else if (pago.archivo_url) {
+      await supabase.storage.from('comprobantes').remove([pago.archivo_url])
+    }
+    setSubiendoMes(null)
+    await cargarPagos()
+  }
+
+  async function eliminarDeposito(deposito: Deposito) {
+    setError(null)
+    if (
+      !window.confirm(
+        `Se eliminará el comprobante del cargue ${deposito.numero_cargue} del depósito y podrás cargar uno nuevo. ¿Deseas continuar?`,
+      )
+    ) {
+      return
+    }
+    setSubiendoCargue(deposito.numero_cargue)
+    const supabase = getSupabase()
+    const { data: borradas, error: errorBorrar } = await supabase
+      .from('depositos')
+      .delete()
+      .eq('id', deposito.id)
+      .select('id')
+    if (errorBorrar || !borradas?.length) {
+      setError('No se pudo eliminar el comprobante. Si ya fue verificado, ya no se puede eliminar.')
+    } else if (deposito.archivo_url) {
+      await supabase.storage.from('comprobantes').remove([deposito.archivo_url])
+    }
+    setSubiendoCargue(null)
     await cargarPagos()
   }
 
@@ -312,6 +380,9 @@ export default function MisPagos() {
         })
 
     if (errorGuardar) setError('No se pudo registrar el depósito.')
+    else if (depositoExistente?.archivo_url && depositoExistente.archivo_url !== ruta) {
+      await supabase.storage.from('comprobantes').remove([depositoExistente.archivo_url])
+    }
 
     setSubiendoCargue(null)
     await cargarPagos()
@@ -383,6 +454,17 @@ export default function MisPagos() {
                       />
                     </label>
                   )}
+
+                  {estado !== 'verificado' && deposito?.archivo_url && (
+                    <button
+                      type="button"
+                      onClick={() => eliminarDeposito(deposito)}
+                      disabled={subiendoCargue !== null}
+                      className="rounded-lg border border-red-600 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                    >
+                      Eliminar
+                    </button>
+                  )}
                 </div>
               </div>
             )
@@ -441,6 +523,17 @@ export default function MisPagos() {
                       }}
                     />
                   </label>
+                )}
+
+                {estado !== 'verificado' && pago?.archivo_url && (
+                  <button
+                    type="button"
+                    onClick={() => eliminarComprobante(pago)}
+                    disabled={subiendoMes !== null}
+                    className="rounded-lg border border-red-600 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    Eliminar
+                  </button>
                 )}
               </div>
             </div>

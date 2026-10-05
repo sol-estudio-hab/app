@@ -138,6 +138,16 @@ Sin el webhook del paso 2, la carga de contratos sigue funcionando con normalida
 huésped los ven igual en la app) — solo no se envía el correo automático ni el botón de
 confirmación.
 
+## Archivar huéspedes
+
+Cuando un huésped se retira antes de tiempo, el admin usa **Archivar** en el detalle del huésped
+(migración 0017): finaliza su acuerdo activo (la habitación queda libre), desactiva la cuenta y la
+marca como archivada, conservando todo el historial. Un huésped archivado no recibe correos, push
+ni WhatsApp (los cron solo consideran acuerdos activos; el correo del contrato también lo omite) y
+no puede crearse un acuerdo por su cuenta. Se oculta del panel salvo que se marque "Mostrar
+huéspedes archivados". **Restaurar** lo saca del archivo; para que vuelva a operar se usa
+"Corregir y reactivar" o "Crear nuevo acuerdo" (ambos lo desarchivan automáticamente).
+
 ## Recordatorios, mora y aviso de basura por cron (Fase 4)
 
 Dos Edge Functions programadas con `pg_cron` (zona horaria del servidor: UTC; los horarios de

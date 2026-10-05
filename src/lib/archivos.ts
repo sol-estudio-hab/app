@@ -11,3 +11,9 @@ const EXTENSION_POR_MIME: Record<string, string> = {
 export function extensionParaMime(mime: string): string {
   return EXTENSION_POR_MIME[mime] ?? 'bin'
 }
+
+/** Extensión (sin punto) de una ruta de storage; 'bin' si no tiene. */
+export function extensionDeRuta(ruta: string): string {
+  const punto = ruta.lastIndexOf('.')
+  return punto === -1 ? 'bin' : ruta.slice(punto + 1)
+}

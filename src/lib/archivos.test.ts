@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extensionParaMime, TAMANO_MAXIMO_BYTES, TIPOS_PERMITIDOS } from './archivos'
+import { extensionDeRuta, extensionParaMime, TAMANO_MAXIMO_BYTES, TIPOS_PERMITIDOS } from './archivos'
 
 describe('TIPOS_PERMITIDOS / TAMANO_MAXIMO_BYTES', () => {
   it('coincide con los tipos y el límite configurados en el bucket de Storage (migración 0002)', () => {
@@ -23,5 +23,16 @@ describe('extensionParaMime', () => {
 
   it('devuelve "bin" para un tipo no reconocido', () => {
     expect(extensionParaMime('application/zip')).toBe('bin')
+  })
+})
+
+describe('extensionDeRuta', () => {
+  it('devuelve la extensión de la ruta de storage', () => {
+    expect(extensionDeRuta('abc-123/2026-09.jpg')).toBe('jpg')
+    expect(extensionDeRuta('abc-123/deposito-1.pdf')).toBe('pdf')
+  })
+
+  it('devuelve "bin" si la ruta no tiene extensión', () => {
+    expect(extensionDeRuta('abc-123/2026-09')).toBe('bin')
   })
 })

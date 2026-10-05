@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import EstadoPagoBadge from '../components/EstadoPagoBadge'
-import { TAMANO_MAXIMO_BYTES, TIPOS_PERMITIDOS, extensionParaMime } from '../lib/archivos'
+import {
+  TAMANO_MAXIMO_BYTES,
+  TIPOS_PERMITIDOS,
+  extensionDeRuta,
+  extensionParaMime,
+} from '../lib/archivos'
 import { estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from '../lib/calendario'
 import { getSupabase } from '../lib/supabase'
 import type { Acuerdo, Contrato, Deposito, Huesped, Pago } from '../types/dominio'
@@ -41,6 +46,12 @@ export default function DetalleHuespedAdmin() {
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [rechazandoCargue, setRechazandoCargue] = useState<1 | 2 | null>(null)
   const [motivoRechazoDeposito, setMotivoRechazoDeposito] = useState('')
+
+  const [archivando, setArchivando] = useState(false)
+  const [procesandoMes, setProcesandoMes] = useState<string | null>(null)
+  const [procesandoCargue, setProcesandoCargue] = useState<1 | 2 | null>(null)
+  const [moviendoMes, setMoviendoMes] = useState<string | null>(null)
+  const [mesDestino, setMesDestino] = useState('')
 
   async function cargar() {
     if (!id) return
@@ -215,7 +226,7 @@ export default function DetalleHuespedAdmin() {
       .eq('id', acuerdoAReactivar.id)
     const { error: errorHuesped } = await supabase
       .from('huespedes')
-      .update({ activo: true })
+      .update({ activo: true, archivado: false, archivado_en: null })
       .eq('id', huesped.id)
 
     setGuardandoAcuerdo(false)
@@ -223,6 +234,7 @@ export default function DetalleHuespedAdmin() {
       setError('No se pudo reactivar el acuerdo.')
       return
     }
+    setHuesped({ ...huesped, activo: true, archivado: false, archivado_en: null })
     setReactivandoId(null)
     await cargarAcuerdos()
   }
@@ -249,7 +261,7 @@ export default function DetalleHuespedAdmin() {
     })
     const { error: errorHuesped } = await supabase
       .from('huespedes')
-      .update({ activo: true })
+      .update({ activo: true, archivado: false, archivado_en: null })
       .eq('id', huesped.id)
 
     setGuardandoAcuerdo(false)
@@ -257,10 +269,48 @@ export default function DetalleHuespedAdmin() {
       setError('No se pudo crear el nuevo acuerdo.')
       return
     }
+    setHuesped({ ...huesped, activo: true, archivado: false, archivado_en: null })
     setMostrandoNuevoAcuerdo(false)
     setFechaIngresoNuevo('')
     setMesesAcuerdoNuevo('')
     await cargarAcuerdos()
+  }
+
+  async function archivarHuesped() {
+    if (!huesped) return
+    setError(null)
+    if (
+      !window.confirm(
+        `¿Archivar a ${huesped.nombres}? Se finalizará su acuerdo activo, la habitación ${huesped.numero_habitacion} quedará libre y no recibirá más correos, avisos ni WhatsApp. El historial se conserva y podrás restaurarlo después.`,
+      )
+    ) {
+      return
+    }
+    setArchivando(true)
+    const { error: errorArchivar } = await getSupabase().rpc('archivar_huesped', {
+      p_huesped_id: huesped.id,
+    })
+    setArchivando(false)
+    if (errorArchivar) {
+      setError('No se pudo archivar al huésped.')
+      return
+    }
+    await cargar()
+  }
+
+  async function restaurarHuesped() {
+    if (!huesped) return
+    setError(null)
+    setArchivando(true)
+    const { error: errorRestaurar } = await getSupabase().rpc('restaurar_huesped', {
+      p_huesped_id: huesped.id,
+    })
+    setArchivando(false)
+    if (errorRestaurar) {
+      setError('No se pudo restaurar al huésped.')
+      return
+    }
+    await cargar()
   }
 
   async function verComprobante(archivoUrl: string) {
@@ -331,6 +381,254 @@ export default function DetalleHuespedAdmin() {
 
     setSubiendoContrato(false)
     await cargar()
+  }
+
+  // Recarga solo pagos y depósitos (no pisa ediciones sin guardar del formulario).
+  async function recargarPagos() {
+    if (!acuerdo) return
+    const supabase = getSupabase()
+    const [pagosRes, depositosRes] = await Promise.all([
+      supabase.from('pagos').select('*').eq('acuerdo_id', acuerdo.id),
+      supabase.from('depositos').select('*').eq('acuerdo_id', acuerdo.id),
+    ])
+    setPagos((pagosRes.data as Pago[]) ?? [])
+    setDepositos((depositosRes.data as Deposito[]) ?? [])
+  }
+
+  function archivoValido(archivo: File): boolean {
+    if (!TIPOS_PERMITIDOS.includes(archivo.type)) {
+      setError('Solo se aceptan imágenes (JPG, PNG, WEBP) o PDF.')
+      return false
+    }
+    if (archivo.size > TAMANO_MAXIMO_BYTES) {
+      setError('El archivo supera el tamaño máximo de 10 MB.')
+      return false
+    }
+    return true
+  }
+
+  // Carga un comprobante en nombre del huésped (p. ej. pago en efectivo).
+  // Queda verificado de inmediato: el administrador es quien lo carga.
+  async function subirComprobanteAdmin(mes: string, pagoExistente: Pago | undefined, archivo: File) {
+    if (!huesped || !acuerdo) return
+    setError(null)
+    if (!archivoValido(archivo)) return
+    if (
+      pagoExistente?.archivo_url &&
+      !window.confirm('Este mes ya tiene un comprobante. ¿Deseas reemplazarlo?')
+    ) {
+      return
+    }
+
+    setProcesandoMes(mes)
+    const supabase = getSupabase()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setProcesandoMes(null)
+      return
+    }
+
+    const ruta = `${huesped.id}/${mes}.${extensionParaMime(archivo.type)}`
+    const { error: errorSubida } = await supabase.storage
+      .from('comprobantes')
+      .upload(ruta, archivo, { upsert: true, contentType: archivo.type })
+    if (errorSubida) {
+      setError('No se pudo subir el archivo. Intenta de nuevo.')
+      setProcesandoMes(null)
+      return
+    }
+
+    const ahora = new Date().toISOString()
+    const datosPago = {
+      archivo_url: ruta,
+      estado: 'verificado' as const,
+      fecha_carga: ahora,
+      verificado_por: user.id,
+      fecha_verificacion: ahora,
+      observaciones: 'Cargado por el administrador.',
+    }
+    const { error: errorGuardar } = pagoExistente
+      ? await supabase.from('pagos').update(datosPago).eq('id', pagoExistente.id)
+      : await supabase.from('pagos').insert({ acuerdo_id: acuerdo.id, mes_pagado: mes, ...datosPago })
+
+    if (errorGuardar) setError('No se pudo registrar el pago.')
+    else if (pagoExistente?.archivo_url && pagoExistente.archivo_url !== ruta) {
+      await supabase.storage.from('comprobantes').remove([pagoExistente.archivo_url])
+    }
+
+    setProcesandoMes(null)
+    await recargarPagos()
+  }
+
+  async function eliminarPago(pago: Pago) {
+    setError(null)
+    const aviso = pago.estado === 'verificado' ? 'Este pago ya está verificado. ' : ''
+    if (
+      !window.confirm(
+        `${aviso}Se eliminará el pago de ${formatearMes(pago.mes_pagado)} junto con su comprobante y el mes quedará sin pago registrado. ¿Continuar?`,
+      )
+    ) {
+      return
+    }
+    setProcesandoMes(pago.mes_pagado)
+    const supabase = getSupabase()
+    const { data: borradas, error: errorBorrar } = await supabase
+      .from('pagos')
+      .delete()
+      .eq('id', pago.id)
+      .select('id')
+    if (errorBorrar || !borradas?.length) {
+      setError('No se pudo eliminar el pago.')
+    } else if (pago.archivo_url) {
+      await supabase.storage.from('comprobantes').remove([pago.archivo_url])
+    }
+    setProcesandoMes(null)
+    await recargarPagos()
+  }
+
+  // Mueve un comprobante (y su estado) de un mes a otro: el mes de origen
+  // queda sin pago y el mes de destino conserva el comprobante movido.
+  async function moverPago(pago: Pago, destino: string) {
+    if (!huesped) return
+    setError(null)
+    if (!destino) {
+      setError('Selecciona el mes al que quieres mover el comprobante.')
+      return
+    }
+    const pagoDestino = pagos.find((p) => p.mes_pagado === destino)
+    if (pagoDestino && (pagoDestino.archivo_url || pagoDestino.estado === 'verificado')) {
+      setError(`${formatearMes(destino)} ya tiene un pago registrado. Elimínalo primero para poder mover este.`)
+      return
+    }
+    if (
+      !window.confirm(
+        `¿Mover el comprobante de ${formatearMes(pago.mes_pagado)} a ${formatearMes(destino)}? ${formatearMes(pago.mes_pagado)} quedará sin pago registrado.`,
+      )
+    ) {
+      return
+    }
+
+    setProcesandoMes(pago.mes_pagado)
+    const supabase = getSupabase()
+    const rutaAnterior = pago.archivo_url
+    const rutaNueva = rutaAnterior ? `${huesped.id}/${destino}.${extensionDeRuta(rutaAnterior)}` : null
+
+    if (rutaAnterior && rutaNueva) {
+      const { error: errorMover } = await supabase.storage
+        .from('comprobantes')
+        .move(rutaAnterior, rutaNueva)
+      if (errorMover) {
+        setError('No se pudo mover el archivo. Es posible que ya exista un archivo en el mes de destino.')
+        setProcesandoMes(null)
+        return
+      }
+    }
+
+    if (pagoDestino) await supabase.from('pagos').delete().eq('id', pagoDestino.id)
+
+    const { data: actualizadas, error: errorActualizar } = await supabase
+      .from('pagos')
+      .update({ mes_pagado: destino, archivo_url: rutaNueva })
+      .eq('id', pago.id)
+      .select('id')
+    if (errorActualizar || !actualizadas?.length) {
+      if (rutaAnterior && rutaNueva) {
+        await supabase.storage.from('comprobantes').move(rutaNueva, rutaAnterior)
+      }
+      setError('No se pudo mover el comprobante.')
+    }
+
+    setMoviendoMes(null)
+    setMesDestino('')
+    setProcesandoMes(null)
+    await recargarPagos()
+  }
+
+  async function subirDepositoAdmin(
+    numeroCargue: 1 | 2,
+    depositoExistente: Deposito | undefined,
+    archivo: File,
+  ) {
+    if (!huesped || !acuerdo) return
+    setError(null)
+    if (!archivoValido(archivo)) return
+    if (
+      depositoExistente?.archivo_url &&
+      !window.confirm(`El cargue ${numeroCargue} ya tiene un comprobante. ¿Deseas reemplazarlo?`)
+    ) {
+      return
+    }
+
+    setProcesandoCargue(numeroCargue)
+    const supabase = getSupabase()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setProcesandoCargue(null)
+      return
+    }
+
+    const ruta = `${huesped.id}/deposito-${numeroCargue}.${extensionParaMime(archivo.type)}`
+    const { error: errorSubida } = await supabase.storage
+      .from('comprobantes')
+      .upload(ruta, archivo, { upsert: true, contentType: archivo.type })
+    if (errorSubida) {
+      setError('No se pudo subir el archivo. Intenta de nuevo.')
+      setProcesandoCargue(null)
+      return
+    }
+
+    const ahora = new Date().toISOString()
+    const datosDeposito = {
+      archivo_url: ruta,
+      estado: 'verificado' as const,
+      fecha_carga: ahora,
+      verificado_por: user.id,
+      fecha_verificacion: ahora,
+      observaciones: 'Cargado por el administrador.',
+    }
+    const { error: errorGuardar } = depositoExistente
+      ? await supabase.from('depositos').update(datosDeposito).eq('id', depositoExistente.id)
+      : await supabase
+          .from('depositos')
+          .insert({ acuerdo_id: acuerdo.id, numero_cargue: numeroCargue, ...datosDeposito })
+
+    if (errorGuardar) setError('No se pudo registrar el depósito.')
+    else if (depositoExistente?.archivo_url && depositoExistente.archivo_url !== ruta) {
+      await supabase.storage.from('comprobantes').remove([depositoExistente.archivo_url])
+    }
+
+    setProcesandoCargue(null)
+    await recargarPagos()
+  }
+
+  async function eliminarDepositoAdmin(deposito: Deposito) {
+    setError(null)
+    const aviso = deposito.estado === 'verificado' ? 'Este cargue ya está verificado. ' : ''
+    if (
+      !window.confirm(
+        `${aviso}Se eliminará el cargue ${deposito.numero_cargue} del depósito junto con su comprobante. ¿Continuar?`,
+      )
+    ) {
+      return
+    }
+    setProcesandoCargue(deposito.numero_cargue)
+    const supabase = getSupabase()
+    const { data: borradas, error: errorBorrar } = await supabase
+      .from('depositos')
+      .delete()
+      .eq('id', deposito.id)
+      .select('id')
+    if (errorBorrar || !borradas?.length) {
+      setError('No se pudo eliminar el cargue del depósito.')
+    } else if (deposito.archivo_url) {
+      await supabase.storage.from('comprobantes').remove([deposito.archivo_url])
+    }
+    setProcesandoCargue(null)
+    await recargarPagos()
   }
 
   async function verificarPago(pago: Pago) {
@@ -423,6 +721,25 @@ export default function DetalleHuespedAdmin() {
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
+      {huesped.archivado && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-300 bg-slate-100 p-3">
+          <p className="text-sm text-slate-700">
+            Huésped archivado
+            {huesped.archivado_en &&
+              ` el ${new Date(huesped.archivado_en).toLocaleDateString('es')}`}
+            . No recibe correos ni avisos y su habitación está libre.
+          </p>
+          <button
+            type="button"
+            onClick={restaurarHuesped}
+            disabled={archivando}
+            className="rounded-lg border border-marca-700 px-3 py-1.5 text-sm font-semibold text-marca-700 hover:bg-marca-50 disabled:opacity-60"
+          >
+            {archivando ? 'Restaurando…' : 'Restaurar'}
+          </button>
+        </div>
+      )}
+
       <div className="mt-6 grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
           Nombres
@@ -489,6 +806,26 @@ export default function DetalleHuespedAdmin() {
           {guardando ? 'Guardando…' : 'Guardar cambios'}
         </button>
       </div>
+
+      {!huesped.archivado && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-white p-4">
+          <div>
+            <h2 className="font-semibold text-slate-900">Archivar huésped</h2>
+            <p className="text-xs text-slate-500">
+              Úsalo cuando el huésped se retira antes de tiempo: finaliza su acuerdo, libera la
+              habitación y deja de enviarle correos, avisos y WhatsApp. El historial se conserva.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={archivarHuesped}
+            disabled={archivando}
+            className="rounded-lg border border-red-600 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+          >
+            {archivando ? 'Archivando…' : 'Archivar'}
+          </button>
+        </div>
+      )}
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -651,6 +988,37 @@ export default function DetalleHuespedAdmin() {
                   {deposito?.estado === 'rechazado' && deposito.observaciones && (
                     <p className="text-xs text-red-600">Motivo: {deposito.observaciones}</p>
                   )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="cursor-pointer rounded-lg border border-marca-700 px-3 py-1.5 text-sm font-semibold text-marca-700 hover:bg-marca-50">
+                      {procesandoCargue === numeroCargue
+                        ? 'Procesando…'
+                        : deposito?.archivo_url
+                          ? 'Reemplazar comprobante'
+                          : 'Cargar comprobante'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
+                        className="hidden"
+                        disabled={procesandoCargue !== null}
+                        onChange={(evento) => {
+                          const archivo = evento.target.files?.[0]
+                          evento.target.value = ''
+                          if (archivo) subirDepositoAdmin(numeroCargue, deposito, archivo)
+                        }}
+                      />
+                    </label>
+                    {deposito && (
+                      <button
+                        type="button"
+                        onClick={() => eliminarDepositoAdmin(deposito)}
+                        disabled={procesandoCargue !== null}
+                        className="rounded-lg border border-red-600 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             })}
@@ -660,6 +1028,10 @@ export default function DetalleHuespedAdmin() {
 
       {acuerdo ? (
         <div className="mt-6 flex flex-col gap-3">
+          <p className="text-xs text-slate-500">
+            Puedes cargar comprobantes en nombre del huésped (por ejemplo, pagos en efectivo: quedan
+            verificados al cargarlos), eliminarlos o moverlos de un mes a otro.
+          </p>
           {meses.map(({ mes, vencimiento }) => {
             const pago = pagos.find((p) => p.mes_pagado === mes)
             const estado = estadoDelMes(vencimiento, pago)
@@ -724,6 +1096,92 @@ export default function DetalleHuespedAdmin() {
 
                 {pago?.estado === 'rechazado' && pago.observaciones && (
                   <p className="text-xs text-red-600">Motivo: {pago.observaciones}</p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="cursor-pointer rounded-lg border border-marca-700 px-3 py-1.5 text-sm font-semibold text-marca-700 hover:bg-marca-50">
+                    {procesandoMes === mes
+                      ? 'Procesando…'
+                      : pago?.archivo_url
+                        ? 'Reemplazar comprobante'
+                        : 'Cargar comprobante'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      className="hidden"
+                      disabled={procesandoMes !== null}
+                      onChange={(evento) => {
+                        const archivo = evento.target.files?.[0]
+                        evento.target.value = ''
+                        if (archivo) subirComprobanteAdmin(mes, pago, archivo)
+                      }}
+                    />
+                  </label>
+                  {pago && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null)
+                          setMesDestino('')
+                          setMoviendoMes(moviendoMes === mes ? null : mes)
+                        }}
+                        disabled={procesandoMes !== null}
+                        className="rounded-lg border border-slate-400 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        Mover a otro mes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => eliminarPago(pago)}
+                        disabled={procesandoMes !== null}
+                        className="rounded-lg border border-red-600 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+                      >
+                        Eliminar
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {pago && moviendoMes === mes && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-2">
+                    <select
+                      value={mesDestino}
+                      onChange={(e) => setMesDestino(e.target.value)}
+                      className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                    >
+                      <option value="">Mover a…</option>
+                      {meses
+                        .filter((m) => m.mes !== mes)
+                        .map((m) => {
+                          const ocupado = pagos.some(
+                            (p) =>
+                              p.mes_pagado === m.mes && (p.archivo_url || p.estado === 'verificado'),
+                          )
+                          return (
+                            <option key={m.mes} value={m.mes} disabled={ocupado}>
+                              {formatearMes(m.mes)}
+                              {ocupado ? ' (ya tiene pago)' : ''}
+                            </option>
+                          )
+                        })}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => moverPago(pago, mesDestino)}
+                      disabled={procesandoMes !== null || !mesDestino}
+                      className="rounded-lg bg-marca-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-800 disabled:opacity-60"
+                    >
+                      Confirmar movimiento
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMoviendoMes(null)}
+                      className="text-sm text-slate-600 underline"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
                 )}
               </div>
             )

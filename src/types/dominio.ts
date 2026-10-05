@@ -8,6 +8,8 @@ export interface Huesped {
   numero_habitacion: string
   numero_whatsapp: string | null
   activo: boolean
+  archivado: boolean
+  archivado_en: string | null
   creado_en: string
   actualizado_en: string
 }

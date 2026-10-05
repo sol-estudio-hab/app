@@ -18,6 +18,7 @@ export default function PanelAdmin() {
   const [error, setError] = useState<string | null>(null)
   const [subiendoReglamento, setSubiendoReglamento] = useState(false)
   const [mensajeReglamento, setMensajeReglamento] = useState<string | null>(null)
+  const [verArchivados, setVerArchivados] = useState(false)
 
   async function subirReglamento(archivo: File) {
     setMensajeReglamento(null)
@@ -110,7 +111,18 @@ export default function PanelAdmin() {
       </div>
 
       {filas && (
-        <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <label className="mt-6 flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={verArchivados}
+            onChange={(e) => setVerArchivados(e.target.checked)}
+          />
+          Mostrar huéspedes archivados ({filas.filter((f) => f.huesped.archivado).length})
+        </label>
+      )}
+
+      {filas && (
+        <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200 bg-white">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
@@ -123,12 +135,16 @@ export default function PanelAdmin() {
               </tr>
             </thead>
             <tbody>
-              {filas.map(({ huesped, estadoMesActual }) => (
+              {filas
+                .filter(({ huesped }) => verArchivados || !huesped.archivado)
+                .map(({ huesped, estadoMesActual }) => (
                 <tr key={huesped.id} className="border-t border-slate-100">
                   <td className="px-4 py-2">{huesped.numero_habitacion}</td>
                   <td className="px-4 py-2">{huesped.nombres}</td>
                   <td className="px-4 py-2">{huesped.correo}</td>
-                  <td className="px-4 py-2">{huesped.activo ? 'Activa' : 'Inactiva'}</td>
+                  <td className="px-4 py-2">
+                    {huesped.archivado ? 'Archivada' : huesped.activo ? 'Activa' : 'Inactiva'}
+                  </td>
                   <td className="px-4 py-2">
                     {estadoMesActual ? <EstadoPagoBadge estado={estadoMesActual} /> : '—'}
                   </td>
