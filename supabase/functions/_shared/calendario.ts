@@ -68,17 +68,21 @@ export function estadoDelMes(vencimiento: Date, pago: PagoEstado | undefined, ho
 
 /**
  * Réplica de estadoActualAcuerdo en src/lib/calendario.ts: primer mes sin verificar en
- * orden cronológico, para que un mes anterior vencido no se "olvide" al empezar un mes
- * nuevo.
+ * orden cronológico entre los que ya empezaron (hasta el mes actual), para que un mes
+ * anterior vencido no se "olvide" al empezar un mes nuevo, y sin que un mes futuro que
+ * todavía no comienza haga ver como "pendiente" a alguien que ya está al día.
  */
 export function estadoActualAcuerdo(
   meses: MesAcuerdo[],
   pagoDeMes: (mes: string) => PagoEstado | undefined,
   hoy = new Date(),
 ): EstadoMes | null {
-  for (const m of meses) {
+  const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+  const mesesYaEmpezados = meses.filter((m) => m.mes <= mesActual)
+  if (mesesYaEmpezados.length === 0) return null
+  for (const m of mesesYaEmpezados) {
     const estado = estadoDelMes(m.vencimiento, pagoDeMes(m.mes), hoy)
     if (estado !== 'verificado') return estado
   }
-  return meses.length > 0 ? 'verificado' : null
+  return 'verificado'
 }

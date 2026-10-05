@@ -107,6 +107,16 @@ describe('estadoActualAcuerdo', () => {
     expect(estadoActualAcuerdo(meses, pagoDeMap(pagos), hoy)).toBe('verificado')
   })
 
+  it('un mes futuro que todavía no empieza no hace ver "pendiente" a alguien al día', () => {
+    const meses = [
+      { mes: '2026-06', vencimiento: new Date(2026, 5, 1) },
+      { mes: '2026-07', vencimiento: new Date(2026, 6, 1) }, // mes actual, ya pagado
+      { mes: '2026-08', vencimiento: new Date(2026, 7, 1) }, // aún no empieza, sin pago
+    ]
+    const pagos = { '2026-06': pago('verificado'), '2026-07': pago('verificado') }
+    expect(estadoActualAcuerdo(meses, pagoDeMap(pagos), hoy)).toBe('verificado')
+  })
+
   it('sin mora previa, refleja el estado normal del mes actual ("pendiente")', () => {
     const meses = [
       { mes: '2026-06', vencimiento: new Date(2026, 5, 1) },

@@ -52,21 +52,27 @@ export function estadoDelMes(vencimiento: Date, pago: Pago | undefined, hoy = ne
 }
 
 /**
- * Estado "actual" relevante de un acuerdo: recorre los meses en orden cronológico y se
- * queda en el primero que no está verificado. Así, si un mes anterior quedó vencido, el
- * estado se mantiene "vencido" al cambiar de mes en vez de volver a mostrar "pendiente"
- * para el mes nuevo (evita la falsa sensación de que ya está al día).
+ * Estado "actual" relevante de un acuerdo: recorre, en orden cronológico, solo los meses
+ * que ya empezaron (hasta el mes calendario actual) y se queda en el primero que no está
+ * verificado. Así, si un mes anterior quedó vencido, el estado se mantiene "vencido" al
+ * cambiar de mes en vez de volver a mostrar "pendiente" (evita la falsa sensación de que ya
+ * está al día). Los meses futuros (que todavía no empiezan) se ignoran a propósito: de lo
+ * contrario, un huésped al día terminaría mostrando "Pendiente" solo porque el próximo mes,
+ * que ni siquiera ha comenzado, todavía no tiene comprobante.
  */
 export function estadoActualAcuerdo(
   meses: MesAcuerdo[],
   pagoDeMes: (mes: string) => Pago | undefined,
   hoy = new Date(),
 ): EstadoMes | null {
-  for (const m of meses) {
+  const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+  const mesesYaEmpezados = meses.filter((m) => m.mes <= mesActual)
+  if (mesesYaEmpezados.length === 0) return null
+  for (const m of mesesYaEmpezados) {
     const estado = estadoDelMes(m.vencimiento, pagoDeMes(m.mes), hoy)
     if (estado !== 'verificado') return estado
   }
-  return meses.length > 0 ? 'verificado' : null
+  return 'verificado'
 }
 
 /** Estado visual de un cargue de depósito (no depende de una fecha de vencimiento). */
