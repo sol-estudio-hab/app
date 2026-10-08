@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react'
 import EstadoPagoBadge from '../components/EstadoPagoBadge'
 import { useAuth } from '../context/AuthContext'
 import { TAMANO_MAXIMO_BYTES, TIPOS_PERMITIDOS, extensionParaMime } from '../lib/archivos'
-import { estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from '../lib/calendario'
+import {
+  estadoDeposito,
+  estadosMesesAcuerdo,
+  formatearMes,
+  generarMesesAcuerdo,
+} from '../lib/calendario'
 import { HABITACIONES } from '../lib/habitaciones'
 import { getSupabase } from '../lib/supabase'
 import type { Deposito, Pago } from '../types/dominio'
@@ -201,6 +206,7 @@ export default function MisPagos() {
   }
 
   const meses = generarMesesAcuerdo(acuerdoActivo.fecha_ingreso, acuerdoActivo.meses_acuerdo)
+  const estadosMeses = estadosMesesAcuerdo(meses, (mes) => pagos.find((p) => p.mes_pagado === mes))
 
   async function verArchivo(archivoUrl: string) {
     const { data, error: errorFirma } = await getSupabase()
@@ -473,9 +479,12 @@ export default function MisPagos() {
       </div>
 
       <div className="mt-6 flex flex-col gap-3">
-        {meses.map(({ mes, vencimiento }) => {
+        {meses.map(({ mes, vencimiento }, indice) => {
           const pago = pagos.find((p) => p.mes_pagado === mes)
-          const estado = estadoDelMes(vencimiento, pago)
+          const estado = estadosMeses[indice]
+          // Los botones dependen del pago real: aunque la tarjeta diga "Pagado" porque el
+          // ciclo vigente está cubierto, el huésped puede adelantar el pago del mes.
+          const pagoVerificado = pago?.estado === 'verificado'
           return (
             <div
               key={mes}
@@ -492,7 +501,7 @@ export default function MisPagos() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <EstadoPagoBadge estado={estado} />
+                {estado && <EstadoPagoBadge estado={estado} />}
 
                 {pago?.archivo_url && (
                   <button
@@ -504,7 +513,7 @@ export default function MisPagos() {
                   </button>
                 )}
 
-                {estado !== 'verificado' && (
+                {!pagoVerificado && (
                   <label className="cursor-pointer rounded-lg bg-marca-700 px-3 py-2 text-sm font-semibold text-white hover:bg-marca-800">
                     {subiendoMes === mes
                       ? 'Subiendo…'
@@ -525,7 +534,7 @@ export default function MisPagos() {
                   </label>
                 )}
 
-                {estado !== 'verificado' && pago?.archivo_url && (
+                {!pagoVerificado && pago?.archivo_url && (
                   <button
                     type="button"
                     onClick={() => eliminarComprobante(pago)}

@@ -7,7 +7,12 @@ import {
   extensionDeRuta,
   extensionParaMime,
 } from '../lib/archivos'
-import { estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from '../lib/calendario'
+import {
+  estadoDeposito,
+  estadosMesesAcuerdo,
+  formatearMes,
+  generarMesesAcuerdo,
+} from '../lib/calendario'
 import { getSupabase } from '../lib/supabase'
 import type { Acuerdo, Contrato, Deposito, Huesped, Pago } from '../types/dominio'
 
@@ -713,6 +718,7 @@ export default function DetalleHuespedAdmin() {
   if (!huesped) return <p className="mt-8 text-center text-slate-500">Huésped no encontrado.</p>
 
   const meses = acuerdo ? generarMesesAcuerdo(acuerdo.fecha_ingreso, acuerdo.meses_acuerdo) : []
+  const estadosMeses = estadosMesesAcuerdo(meses, (mes) => pagos.find((p) => p.mes_pagado === mes))
 
   return (
     <section>
@@ -1032,9 +1038,9 @@ export default function DetalleHuespedAdmin() {
             Puedes cargar comprobantes en nombre del huésped (por ejemplo, pagos en efectivo: quedan
             verificados al cargarlos), eliminarlos o moverlos de un mes a otro.
           </p>
-          {meses.map(({ mes, vencimiento }) => {
+          {meses.map(({ mes, vencimiento }, indice) => {
             const pago = pagos.find((p) => p.mes_pagado === mes)
-            const estado = estadoDelMes(vencimiento, pago)
+            const estado = estadosMeses[indice]
             return (
               <div key={mes} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1044,7 +1050,7 @@ export default function DetalleHuespedAdmin() {
                       Vence el {vencimiento.toLocaleDateString('es')}
                     </p>
                   </div>
-                  <EstadoPagoBadge estado={estado} />
+                  {estado && <EstadoPagoBadge estado={estado} />}
                 </div>
 
                 {pago?.archivo_url && (

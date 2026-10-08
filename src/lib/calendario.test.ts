@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { estadoActualAcuerdo, estadoDelMes, estadoDeposito, formatearMes, generarMesesAcuerdo } from './calendario'
+import {
+  estadoActualAcuerdo,
+  estadoDelMes,
+  estadoDeposito,
+  estadosMesesAcuerdo,
+  formatearMes,
+  generarMesesAcuerdo,
+} from './calendario'
 import type { Pago } from '../types/dominio'
 
 function pago(estado: Pago['estado']): Pago {
@@ -141,6 +148,65 @@ describe('estadoActualAcuerdo', () => {
     ]
     const pagos = { '2026-06': pago('cargado') }
     expect(estadoActualAcuerdo(meses, pagoDeMap(pagos), hoy)).toBe('en_revision')
+  })
+})
+
+describe('estadosMesesAcuerdo (ingreso el día 25, septiembre pagado)', () => {
+  const meses = generarMesesAcuerdo('2026-09-25', 4) // 25 sep, 25 oct, 25 nov, 25 dic
+  const septiembrePagado = (mes: string) => (mes === '2026-09' ? pago('verificado') : undefined)
+
+  function estadosEl(dia: number, mesIndice = 9) {
+    return estadosMesesAcuerdo(meses, septiembrePagado, new Date(2026, mesIndice, dia))
+  }
+
+  it('hasta el 19 de octubre octubre se ve "Pagado" y los meses lejanos no tienen etiqueta', () => {
+    expect(estadosEl(8)).toEqual(['verificado', 'verificado', null, null])
+    expect(estadosEl(19)).toEqual(['verificado', 'verificado', null, null])
+  })
+
+  it('del 20 al 25 de octubre pasa a "Pendiente"', () => {
+    expect(estadosEl(20)[1]).toBe('pendiente')
+    expect(estadosEl(25)[1]).toBe('pendiente')
+  })
+
+  it('desde el 26 de octubre está "Vencido" (en mora)', () => {
+    expect(estadosEl(26)[1]).toBe('vencido')
+  })
+
+  it('el primer mes sin pago nunca se ve "Pagado" aunque falte más de 5 días', () => {
+    const estados = estadosMesesAcuerdo(meses, () => undefined, new Date(2026, 8, 1))
+    expect(estados[0]).toBe('pendiente')
+  })
+
+  it('si el mes anterior está en revisión, el siguiente mes lejano no tiene etiqueta', () => {
+    const enRevision = (mes: string) => (mes === '2026-09' ? pago('cargado') : undefined)
+    const estados = estadosMesesAcuerdo(meses, enRevision, new Date(2026, 9, 8))
+    expect(estados[0]).toBe('en_revision')
+    expect(estados[1]).toBeNull()
+  })
+
+  it('un pago adelantado de octubre sigue verificado', () => {
+    const adelantado = (mes: string) =>
+      mes === '2026-09' || mes === '2026-10' ? pago('verificado') : undefined
+    expect(estadosMesesAcuerdo(meses, adelantado, new Date(2026, 9, 8))).toEqual([
+      'verificado',
+      'verificado',
+      'verificado',
+      null,
+    ])
+  })
+
+  it('el estado actual del acuerdo sigue el mismo calendario', () => {
+    const pagoDeMes = septiembrePagado
+    expect(estadoActualAcuerdo(meses, pagoDeMes, new Date(2026, 9, 8))).toBe('verificado')
+    expect(estadoActualAcuerdo(meses, pagoDeMes, new Date(2026, 9, 19))).toBe('verificado')
+    expect(estadoActualAcuerdo(meses, pagoDeMes, new Date(2026, 9, 20))).toBe('pendiente')
+    expect(estadoActualAcuerdo(meses, pagoDeMes, new Date(2026, 9, 26))).toBe('vencido')
+  })
+
+  it('el mes vencido sigue en mora aunque ya empiece la ventana del mes siguiente', () => {
+    // Octubre sin pagar, hoy 21 de noviembre: octubre vencido gana sobre noviembre pendiente.
+    expect(estadoActualAcuerdo(meses, septiembrePagado, new Date(2026, 10, 21))).toBe('vencido')
   })
 })
 

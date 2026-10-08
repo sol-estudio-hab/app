@@ -66,23 +66,40 @@ export function estadoDelMes(vencimiento: Date, pago: PagoEstado | undefined, ho
   return hoySinHora > vencimientoSinHora ? 'vencido' : 'pendiente'
 }
 
+/** Días antes del vencimiento en que un mes sin pago pasa de "Pagado" a "Pendiente". */
+export const DIAS_AVISO_PREVIO = 5
+
+function diasHastaVencimiento(vencimiento: Date, hoy: Date): number {
+  const aUtc = (f: Date) => Date.UTC(f.getFullYear(), f.getMonth(), f.getDate())
+  return Math.round((aUtc(vencimiento) - aUtc(hoy)) / 86_400_000)
+}
+
+/** Réplica de estadosMesesAcuerdo en src/lib/calendario.ts. */
+export function estadosMesesAcuerdo(
+  meses: MesAcuerdo[],
+  pagoDeMes: (mes: string) => PagoEstado | undefined,
+  hoy = new Date(),
+): (EstadoMes | null)[] {
+  return meses.map((m, i) => {
+    const estado = estadoDelMes(m.vencimiento, pagoDeMes(m.mes), hoy)
+    if (estado !== 'pendiente') return estado
+    if (i === 0 || diasHastaVencimiento(m.vencimiento, hoy) <= DIAS_AVISO_PREVIO) return 'pendiente'
+    return pagoDeMes(meses[i - 1].mes)?.estado === 'verificado' ? 'verificado' : null
+  })
+}
+
 /**
- * Réplica de estadoActualAcuerdo en src/lib/calendario.ts: primer mes sin verificar en
- * orden cronológico entre los que ya empezaron (hasta el mes actual), para que un mes
- * anterior vencido no se "olvide" al empezar un mes nuevo, y sin que un mes futuro que
- * todavía no comienza haga ver como "pendiente" a alguien que ya está al día.
+ * Réplica de estadoActualAcuerdo en src/lib/calendario.ts: primer mes que no está "Pagado"
+ * ni sin etiqueta, para que un mes anterior vencido no se "olvide" al empezar un mes nuevo y
+ * un huésped al día siga "Pagado" hasta 5 días antes del próximo vencimiento.
  */
 export function estadoActualAcuerdo(
   meses: MesAcuerdo[],
   pagoDeMes: (mes: string) => PagoEstado | undefined,
   hoy = new Date(),
 ): EstadoMes | null {
-  const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
-  const mesesYaEmpezados = meses.filter((m) => m.mes <= mesActual)
-  if (mesesYaEmpezados.length === 0) return null
-  for (const m of mesesYaEmpezados) {
-    const estado = estadoDelMes(m.vencimiento, pagoDeMes(m.mes), hoy)
-    if (estado !== 'verificado') return estado
+  for (const estado of estadosMesesAcuerdo(meses, pagoDeMes, hoy)) {
+    if (estado && estado !== 'verificado') return estado
   }
-  return 'verificado'
+  return meses.length > 0 ? 'verificado' : null
 }

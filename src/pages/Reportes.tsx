@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import EstadoPagoBadge from '../components/EstadoPagoBadge'
-import { ETIQUETA_ESTADO_MES, estadoDelMes, generarMesesAcuerdo, type EstadoMes } from '../lib/calendario'
+import { ETIQUETA_ESTADO_MES, estadosMesesAcuerdo, generarMesesAcuerdo, type EstadoMes } from '../lib/calendario'
 import { exportarCsv } from '../lib/csv'
 import { getSupabase } from '../lib/supabase'
 import type { Acuerdo, Huesped, Pago } from '../types/dominio'
@@ -58,11 +58,13 @@ export default function Reportes() {
         const acuerdo = acuerdoPorHuesped.get(huesped.id)
         if (!acuerdo) continue
         const meses = generarMesesAcuerdo(acuerdo.fecha_ingreso, acuerdo.meses_acuerdo)
-        const mesInfo = meses.find((m) => m.mes === mes)
-        const pagoMes = mesInfo
-          ? pagos.find((p) => p.acuerdo_id === acuerdo.id && p.mes_pagado === mes)
-          : undefined
-        const estadoMes = mesInfo ? estadoDelMes(mesInfo.vencimiento, pagoMes) : null
+        const indiceMes = meses.findIndex((m) => m.mes === mes)
+        const estadoMes =
+          indiceMes === -1
+            ? null
+            : estadosMesesAcuerdo(meses, (m) =>
+                pagos.find((p) => p.acuerdo_id === acuerdo.id && p.mes_pagado === m),
+              )[indiceMes]
         const mesesVerificados = pagos.filter(
           (p) => p.acuerdo_id === acuerdo.id && p.estado === 'verificado',
         ).length
