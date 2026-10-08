@@ -23,6 +23,7 @@ const ETIQUETAS_RESUMEN: { clave: EstadoMes; etiqueta: string; clase: string }[]
   { clave: 'rechazado', etiqueta: 'Rechazados', clase: 'bg-red-50 text-red-800' },
   { clave: 'pendiente', etiqueta: 'Pendientes', clase: 'bg-slate-50 text-slate-700' },
   { clave: 'vencido', etiqueta: 'Vencidos', clase: 'bg-red-50 text-red-800' },
+  { clave: 'proximo', etiqueta: 'Próximos', clase: 'bg-sky-50 text-sky-800' },
 ]
 
 export default function Reportes() {

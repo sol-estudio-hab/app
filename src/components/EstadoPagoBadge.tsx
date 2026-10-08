@@ -6,6 +6,7 @@ const CLASES: Record<EstadoMes, string> = {
   rechazado: 'bg-red-100 text-red-800',
   pendiente: 'bg-slate-100 text-slate-700',
   vencido: 'bg-red-100 text-red-800',
+  proximo: 'bg-sky-100 text-sky-800',
 }
 
 export default function EstadoPagoBadge({ estado }: { estado: EstadoMes }) {

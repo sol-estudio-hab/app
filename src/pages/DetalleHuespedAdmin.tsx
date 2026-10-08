@@ -1050,7 +1050,7 @@ export default function DetalleHuespedAdmin() {
                       Vence el {vencimiento.toLocaleDateString('es')}
                     </p>
                   </div>
-                  {estado && <EstadoPagoBadge estado={estado} />}
+                  <EstadoPagoBadge estado={estado} />
                 </div>
 
                 {pago?.archivo_url && (

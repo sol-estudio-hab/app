@@ -159,9 +159,9 @@ describe('estadosMesesAcuerdo (ingreso el día 25, septiembre pagado)', () => {
     return estadosMesesAcuerdo(meses, septiembrePagado, new Date(2026, mesIndice, dia))
   }
 
-  it('hasta el 19 de octubre octubre se ve "Pagado" y los meses lejanos no tienen etiqueta', () => {
-    expect(estadosEl(8)).toEqual(['verificado', 'verificado', null, null])
-    expect(estadosEl(19)).toEqual(['verificado', 'verificado', null, null])
+  it('hasta el 19 de octubre los meses sin pago que aún no abren su ventana son "Próximo"', () => {
+    expect(estadosEl(8)).toEqual(['verificado', 'proximo', 'proximo', 'proximo'])
+    expect(estadosEl(19)).toEqual(['verificado', 'proximo', 'proximo', 'proximo'])
   })
 
   it('del 20 al 25 de octubre pasa a "Pendiente"', () => {
@@ -173,16 +173,9 @@ describe('estadosMesesAcuerdo (ingreso el día 25, septiembre pagado)', () => {
     expect(estadosEl(26)[1]).toBe('vencido')
   })
 
-  it('el primer mes sin pago nunca se ve "Pagado" aunque falte más de 5 días', () => {
+  it('el primer mes sin pago es "Pendiente" (no "Próximo") aunque falte más de 5 días', () => {
     const estados = estadosMesesAcuerdo(meses, () => undefined, new Date(2026, 8, 1))
     expect(estados[0]).toBe('pendiente')
-  })
-
-  it('si el mes anterior está en revisión, el siguiente mes lejano no tiene etiqueta', () => {
-    const enRevision = (mes: string) => (mes === '2026-09' ? pago('cargado') : undefined)
-    const estados = estadosMesesAcuerdo(meses, enRevision, new Date(2026, 9, 8))
-    expect(estados[0]).toBe('en_revision')
-    expect(estados[1]).toBeNull()
   })
 
   it('un pago adelantado de octubre sigue verificado', () => {
@@ -191,12 +184,12 @@ describe('estadosMesesAcuerdo (ingreso el día 25, septiembre pagado)', () => {
     expect(estadosMesesAcuerdo(meses, adelantado, new Date(2026, 9, 8))).toEqual([
       'verificado',
       'verificado',
-      'verificado',
-      null,
+      'proximo',
+      'proximo',
     ])
   })
 
-  it('el estado actual del acuerdo sigue el mismo calendario', () => {
+  it('el estado actual del huésped dice "Pagado" (no "Próximo") mientras el ciclo esté cubierto', () => {
     const pagoDeMes = septiembrePagado
     expect(estadoActualAcuerdo(meses, pagoDeMes, new Date(2026, 9, 8))).toBe('verificado')
     expect(estadoActualAcuerdo(meses, pagoDeMes, new Date(2026, 9, 19))).toBe('verificado')

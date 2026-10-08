@@ -46,7 +46,13 @@ export function sumarDias(fecha: Date, dias: number): Date {
   return resultado
 }
 
-export type EstadoMes = 'verificado' | 'en_revision' | 'rechazado' | 'pendiente' | 'vencido'
+export type EstadoMes =
+  | 'verificado'
+  | 'en_revision'
+  | 'rechazado'
+  | 'pendiente'
+  | 'vencido'
+  | 'proximo'
 
 interface PagoEstado {
   estado: string
@@ -79,19 +85,19 @@ export function estadosMesesAcuerdo(
   meses: MesAcuerdo[],
   pagoDeMes: (mes: string) => PagoEstado | undefined,
   hoy = new Date(),
-): (EstadoMes | null)[] {
+): EstadoMes[] {
   return meses.map((m, i) => {
     const estado = estadoDelMes(m.vencimiento, pagoDeMes(m.mes), hoy)
     if (estado !== 'pendiente') return estado
     if (i === 0 || diasHastaVencimiento(m.vencimiento, hoy) <= DIAS_AVISO_PREVIO) return 'pendiente'
-    return pagoDeMes(meses[i - 1].mes)?.estado === 'verificado' ? 'verificado' : null
+    return 'proximo'
   })
 }
 
 /**
- * Réplica de estadoActualAcuerdo en src/lib/calendario.ts: primer mes que no está "Pagado"
- * ni sin etiqueta, para que un mes anterior vencido no se "olvide" al empezar un mes nuevo y
- * un huésped al día siga "Pagado" hasta 5 días antes del próximo vencimiento.
+ * Réplica de estadoActualAcuerdo en src/lib/calendario.ts: primer mes que no está "Pagado" ni
+ * "Próximo", para que un mes anterior vencido no se "olvide" al empezar un mes nuevo y un
+ * huésped con el ciclo vigente pagado siga "Pagado" hasta 5 días antes del siguiente vencimiento.
  */
 export function estadoActualAcuerdo(
   meses: MesAcuerdo[],
@@ -99,7 +105,7 @@ export function estadoActualAcuerdo(
   hoy = new Date(),
 ): EstadoMes | null {
   for (const estado of estadosMesesAcuerdo(meses, pagoDeMes, hoy)) {
-    if (estado && estado !== 'verificado') return estado
+    if (estado !== 'verificado' && estado !== 'proximo') return estado
   }
   return meses.length > 0 ? 'verificado' : null
 }

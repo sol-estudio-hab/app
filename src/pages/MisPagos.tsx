@@ -501,7 +501,7 @@ export default function MisPagos() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                {estado && <EstadoPagoBadge estado={estado} />}
+                <EstadoPagoBadge estado={estado} />
 
                 {pago?.archivo_url && (
                   <button
