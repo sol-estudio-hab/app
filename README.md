@@ -138,6 +138,68 @@ Sin el webhook del paso 2, la carga de contratos sigue funcionando con normalida
 huésped los ven igual en la app) — solo no se envía el correo automático ni el botón de
 confirmación.
 
+## Firma de contratos por enlace
+
+Sistema sencillo de firma de PDFs (tipo Adobe Sign, mínimo) para que estudiantes y responsables firmen
+el acuerdo desde el celular. El admin sube el PDF, define los firmantes y dibuja dónde firma cada uno;
+cada firmante recibe **su propio enlace** (`/firmar?t=<token>`), lee el PDF, dibuja su firma y la envía.
+El PDF final acumula las firmas (el segundo firmante parte del PDF ya firmado por el primero).
+
+**Admin** (menú "Firmas", `/admin/firmas`):
+- *Nuevo contrato*: título, habitación, PDF (máx. 10 MB), firmantes (responsable / estudiante), y
+  casillas de firma dibujadas arrastrando sobre el PDF. Al crear, muestra los enlaces con
+  "Copiar enlace" y "Copiar mensaje de WhatsApp" ("Hola {nombre}, firma tu acuerdo de arrendamiento de
+  la habitación {room} aquí: {enlace}").
+- *Lista*: estado (pendiente / firma parcial / completado), quién firmó y cuándo, enlaces de los que
+  faltan, descarga del PDF firmado (o con las firmas hasta ahora), y eliminar.
+
+**Firmante** (`/firmar?t=…`, sin cuenta): ve el título, su nombre y rol y el PDF con sus casillas en
+dorado; toca "Firmar", dibuja la firma (Borrar / Cancelar / Aplicar), acepta "He leído el acuerdo y
+acepto firmarlo" y envía. Si el enlace ya se usó dice "Este documento ya fue firmado" y ofrece su copia.
+
+**Seguridad**: el navegador del firmante nunca toca las tablas ni el bucket (RLS solo para admin). Todo
+pasa por dos Edge Functions públicas con el token (UUID impredecible, uno por firmante):
+[firma-sesion](supabase/functions/firma-sesion) (datos + URL temporal de 15 min al PDF) y
+[firma-enviar](supabase/functions/firma-enviar) (reclama el token de forma atómica y **estampa la firma
+en el servidor** con `pdf-lib` sobre las casillas guardadas, así que no se puede subir un PDF alterado;
+si dos firmantes envían a la vez, un control de versión evita que se pisen). Se guarda la IP y la fecha.
+
+### Puesta en marcha
+
+1. Migración `0018_firmas.sql` (tablas `firma_contratos`, `firma_firmantes`, `firma_campos` y bucket
+   privado `firmas`):
+
+   ```bash
+   npx supabase@latest db query --file supabase/migrations/0018_firmas.sql --linked
+   ```
+
+2. Desplegar las dos funciones **sin** verificación de JWT (el firmante no tiene sesión; el token es la
+   credencial). No necesitan secrets nuevos:
+
+   ```bash
+   supabase functions deploy firma-sesion --no-verify-jwt
+   supabase functions deploy firma-enviar --no-verify-jwt
+   ```
+
+3. Dominio `firmas.solestudiohab.com` (opcional pero recomendado): en Cloudflare → Workers & Pages →
+   el proyecto de la app → **Custom domains → Set up a custom domain** → `firmas.solestudiohab.com`.
+   Si el DNS está en Cloudflare, el registro CNAME se crea solo; si no, crea en tu proveedor un
+   `CNAME firmas → <proyecto>.pages.dev`. Es el mismo sitio: en ese dominio, `/?t=<token>` abre
+   directo la pantalla de firma.
+4. En Cloudflare Pages → Settings → Environment variables, agrega
+   `VITE_URL_FIRMAS=https://firmas.solestudiohab.com` y vuelve a desplegar. Con eso los enlaces
+   copiados usan ese dominio; sin la variable usan el del sitio actual (siempre funcionan).
+5. Logo: el girasol del encabezado de `/firmar` es un marcador de posición
+   ([LogoGirasol.tsx](src/components/firmas/LogoGirasol.tsx)); el archivo explica cómo poner el real.
+
+Prueba completa con dos firmantes: [docs/firmas-prueba-e2e.md](docs/firmas-prueba-e2e.md).
+
+**Límites conocidos**: PDF de máximo 10 MB; páginas del PDF con rotación (`/Rotate`) no están
+soportadas (la firma saldría girada); es una firma electrónica simple (imagen dibujada + fecha + IP).
+
+**Fase 2 (no incluido)**: envío de los enlaces por correo/WhatsApp automático, recordatorios a quien no
+ha firmado, sello de tiempo certificado y guardar el PDF firmado en "Mis contratos" del huésped.
+
 ## Crear un huésped desde el admin
 
 Opción **Nuevo huésped** del menú del admin (`/admin/huespedes/nuevo`) para dar de alta a quien no

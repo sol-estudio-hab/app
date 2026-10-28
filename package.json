@@ -13,13 +13,15 @@
     "test:coverage": "vitest run --coverage",
     "test:seguridad": "vitest run tests/seguridad.test.ts",
     "test:e2e": "playwright test",
-    "audit": "better-npm-audit audit --level high --production --exclude 1124282"
+    "audit": "better-npm-audit audit --level high --production --exclude 1138769"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.1"
+    "react-router-dom": "^7.18.1",
+    "signature_pad": "^5.1.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

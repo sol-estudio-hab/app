@@ -18,6 +18,9 @@ export default defineConfig({
       // el usuario tenga que hacer Ctrl+F5.
       injectRegister: false,
       includeAssets: ['favicon.svg'],
+      // pdf.js (~490 KB) solo lo usan las pantallas de firma: se descarga al abrirlas
+      // en vez de precargarse en el celular de todos los huéspedes.
+      injectManifest: { globIgnores: ['**/pdf-*.js'] },
       devOptions: {
         enabled: true,
         type: 'module',

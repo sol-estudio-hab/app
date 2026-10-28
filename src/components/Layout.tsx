@@ -46,6 +46,9 @@ export default function Layout() {
           <Link to="/admin/huespedes/nuevo" className="hover:underline">
             Nuevo huésped
           </Link>
+          <Link to="/admin/firmas" className="hover:underline">
+            Firmas
+          </Link>
           <Link to="/admin/reportes" className="hover:underline">
             Reportes
           </Link>
