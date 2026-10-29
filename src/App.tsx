@@ -6,6 +6,7 @@ import RutaPrivada from './components/RutaPrivada'
 import DetalleHuespedAdmin from './pages/DetalleHuespedAdmin'
 import Inicio from './pages/Inicio'
 import Ingresar from './pages/Ingresar'
+import MenuPrincipal from './pages/MenuPrincipal'
 import MiPerfil from './pages/MiPerfil'
 import MisPagos from './pages/MisPagos'
 import NoEncontrado from './pages/NoEncontrado'
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="recuperar-contrasena" element={<RecuperarContrasena />} />
           <Route path="restablecer-contrasena" element={<RestablecerContrasena />} />
           <Route element={<RutaPrivada />}>
+            <Route path="menu" element={<MenuPrincipal />} />
             <Route path="perfil" element={<MiPerfil />} />
             <Route path="pagos" element={<MisPagos />} />
             <Route path="notificaciones" element={<Notificaciones />} />

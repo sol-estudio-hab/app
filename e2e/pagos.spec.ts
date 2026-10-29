@@ -18,7 +18,8 @@ test.describe('Huésped — calendario y carga de pagos', () => {
     await page.getByLabel('Correo electrónico').fill(HUESPED_EMAIL!)
     await page.getByLabel('Contraseña').fill(HUESPED_PASSWORD!)
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page.getByRole('link', { name: 'Ir a mis pagos' })).toBeVisible({ timeout: 15_000 })
+    // Al iniciar sesión se llega al menú principal, donde "Mis pagos" es una tarjeta.
+    await expect(page.getByRole('link', { name: 'Mis pagos' })).toBeVisible({ timeout: 15_000 })
   })
 
   test('el calendario de pagos muestra los meses del acuerdo con su estado', async ({ page }) => {

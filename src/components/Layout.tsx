@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import ActivarPush from './ActivarPush'
+import MenuHamburguesa, { type ItemHamburguesa } from './MenuHamburguesa'
 import { useAuth } from '../context/AuthContext'
+import { opcionesMenu } from '../lib/menu'
 import { getSupabase } from '../lib/supabase'
 import { configuracionLista } from '../lib/supabase'
 
@@ -36,91 +38,42 @@ export default function Layout() {
     navegar('/')
   }
 
-  const enlaces = sesion ? (
-    <>
-      {esAdmin && (
-        <>
-          <Link to="/admin" className="hover:underline">
-            Panel admin
-          </Link>
-          <Link to="/admin/huespedes/nuevo" className="hover:underline">
-            Nuevo huésped
-          </Link>
-          <Link to="/admin/firmas" className="hover:underline">
-            Firmas
-          </Link>
-          <Link to="/admin/reportes" className="hover:underline">
-            Reportes
-          </Link>
-        </>
-      )}
-      <Link to="/pagos" className="hover:underline">
-        Mis pagos
-      </Link>
-      {huesped && (
-        <Link to="/notificaciones" className="relative hover:underline">
-          Notificaciones
-          {noLeidas > 0 && (
-            <span className="ml-1 rounded-full bg-sol-500 px-1.5 py-0.5 text-xs font-semibold text-slate-900">
-              {noLeidas}
-            </span>
-          )}
-        </Link>
-      )}
-      <Link to="/perfil" className="hover:underline">
-        Mi perfil
-      </Link>
-      <button type="button" onClick={salir} className="text-left hover:underline">
-        Cerrar sesión
-      </button>
-    </>
-  ) : (
-    <>
-      <Link to="/ingresar" className="hover:underline">
-        Iniciar sesión
-      </Link>
-      <Link to="/registro" className="hover:underline">
-        Crear cuenta
-      </Link>
-    </>
-  )
+  const items: ItemHamburguesa[] = sesion
+    ? [
+        { to: '/menu', etiqueta: 'Menú principal' },
+        ...opcionesMenu({ esAdmin, tieneHuesped: Boolean(huesped) }).map((opcion) => ({
+          to: opcion.to,
+          etiqueta: opcion.titulo,
+          contador: opcion.id === 'notificaciones' ? noLeidas : undefined,
+        })),
+      ]
+    : [
+        { to: '/ingresar', etiqueta: 'Iniciar sesión' },
+        { to: '/registro', etiqueta: 'Crear cuenta' },
+      ]
+
+  // El menú principal (tarjetas) usa más ancho que el resto de las pantallas.
+  const ancho = ubicacion.pathname === '/menu' ? 'max-w-6xl' : 'max-w-3xl'
 
   return (
     <div className="flex min-h-dvh flex-col">
       <ActivarPush />
       <header className="bg-marca-700 text-white shadow">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+        <div className={`mx-auto flex ${ancho} items-center gap-3 px-4 py-3`}>
           <img src="/favicon.svg" alt="" className="h-8 w-8" />
-          <Link to="/" className="text-lg font-semibold">
+          <Link to={sesion ? '/menu' : '/'} className="text-lg font-semibold">
             Sol Estudio Hab
           </Link>
 
-          <nav className="ml-auto hidden items-center gap-4 text-sm sm:flex">{enlaces}</nav>
-
-          <button
-            type="button"
-            onClick={() => setMenuAbierto((abierto) => !abierto)}
-            aria-label={menuAbierto ? 'Cerrar menú' : 'Abrir menú'}
-            aria-expanded={menuAbierto}
-            className="ml-auto flex h-9 w-9 flex-col items-center justify-center gap-1.5 sm:hidden"
-          >
-            <span
-              className={`h-0.5 w-6 rounded-full bg-white transition-transform ${menuAbierto ? 'translate-y-2 rotate-45' : ''}`}
-            />
-            <span
-              className={`h-0.5 w-6 rounded-full bg-white transition-opacity ${menuAbierto ? 'opacity-0' : ''}`}
-            />
-            <span
-              className={`h-0.5 w-6 rounded-full bg-white transition-transform ${menuAbierto ? '-translate-y-2 -rotate-45' : ''}`}
-            />
-          </button>
+          <MenuHamburguesa
+            abierto={menuAbierto}
+            onAlternar={() => setMenuAbierto((abierto) => !abierto)}
+            onCerrar={() => setMenuAbierto(false)}
+            items={items}
+            accion={sesion ? { etiqueta: 'Cerrar sesión', onClick: salir } : undefined}
+            aviso={noLeidas > 0}
+          />
         </div>
-
-        {menuAbierto && (
-          <nav className="flex flex-col gap-3 border-t border-white/20 px-4 py-4 text-sm sm:hidden">
-            {enlaces}
-          </nav>
-        )}
       </header>
 
       {!configuracionLista && (
@@ -129,7 +82,7 @@ export default function Layout() {
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+      <main className={`mx-auto w-full ${ancho} flex-1 px-4 py-6`}>
         <Outlet />
       </main>
 

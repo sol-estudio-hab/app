@@ -1,27 +1,11 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Inicio() {
-  const { sesion, huesped } = useAuth()
+  const { sesion } = useAuth()
 
-  if (sesion) {
-    return (
-      <section className="mx-auto max-w-md text-center">
-        <h1 className="mt-8 text-2xl font-bold text-marca-900">
-          Hola{huesped ? `, ${huesped.nombres}` : ''}
-        </h1>
-        <p className="mt-3 text-slate-600">
-          Consulta el estado de tus pagos y sube tu comprobante cada mes.
-        </p>
-        <Link
-          to="/pagos"
-          className="mt-8 inline-block rounded-lg bg-marca-700 px-4 py-3 font-semibold text-white shadow hover:bg-marca-800"
-        >
-          Ir a mis pagos
-        </Link>
-      </section>
-    )
-  }
+  // Con sesión iniciada, el inicio es el menú principal.
+  if (sesion) return <Navigate to="/menu" replace />
 
   return (
     <section className="mx-auto max-w-md text-center">
