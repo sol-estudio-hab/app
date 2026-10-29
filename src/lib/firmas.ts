@@ -26,7 +26,18 @@ export interface FirmaContrato {
   ruta_firmado: string | null
   estado: 'pendiente' | 'parcial' | 'completado'
   creado_en: string
+  huesped_id: string | null
+  correo_enviado_en: string | null
 }
+
+/** Roles de firmante. El arrendador (propietario) firma desde el panel cargando una imagen. */
+export const ROLES_FIRMANTE: { valor: string; etiqueta: string }[] = [
+  { valor: 'arrendador', etiqueta: 'Arrendador (propietario)' },
+  { valor: 'responsable', etiqueta: 'Responsable' },
+  { valor: 'estudiante', etiqueta: 'Estudiante' },
+]
+
+export const ROL_ARRENDADOR = 'arrendador'
 
 export interface FirmaFirmante {
   id: string

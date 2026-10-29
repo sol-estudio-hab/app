@@ -58,6 +58,10 @@ export interface Contrato {
   creado_en: string
   confirmado_leido: boolean
   confirmado_en: string | null
+  /** Bucket donde vive el PDF: 'contratos' (subido a mano) o 'firmas' (firmado digitalmente). */
+  bucket: string
+  /** Si viene de una firma digital, el contrato de firma al que está vinculado (mismo archivo). */
+  firma_contrato_id: string | null
 }
 
 export type TipoNotificacion = 'recordatorio' | 'mora' | 'confirmacion' | 'fin_acuerdo' | 'aviso_basura'

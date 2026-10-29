@@ -40,11 +40,16 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    const { data } = await supabase
+    const { data, error: errorBusqueda } = await supabase
       .from('firma_firmantes')
       .select('id, nombre, rol, firmado_en, firma_contratos(titulo, habitacion, ruta_original, ruta_firmado)')
       .eq('token', token)
       .maybeSingle()
+    // Un fallo técnico no es un enlace inválido: se pide reintentar.
+    if (errorBusqueda) {
+      console.error(errorBusqueda)
+      return errorJson('No se pudo cargar el documento. Intenta de nuevo en unos segundos.', 503)
+    }
     const firmante = data as unknown as FirmanteConContrato | null
     if (!firmante) return errorJson('Enlace inválido o vencido', 404)
 

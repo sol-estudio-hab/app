@@ -1,10 +1,12 @@
-import { type ChangeEvent, useState } from 'react'
+import { type ChangeEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import CapaCampos, { type CampoEditable } from '../components/firmas/CapaCampos'
 import EnlaceFirmante from '../components/firmas/EnlaceFirmante'
 import VisorPdf from '../components/firmas/VisorPdf'
 import { TAMANO_MAXIMO_BYTES } from '../lib/archivos'
+import { ROLES_FIRMANTE, ROL_ARRENDADOR } from '../lib/firmas'
 import { HABITACIONES } from '../lib/habitaciones'
+import { type HuespedVigente, cargarHuespedesVigentes } from '../lib/huespedesVigentes'
 import { getSupabase } from '../lib/supabase'
 
 interface FirmanteForm {
@@ -20,6 +22,7 @@ interface Creado {
   firmantes: { id: string; nombre: string; rol: string; token: string }[]
 }
 
+
 const COLORES = ['#055741', '#b45309', '#1d4ed8', '#9333ea', '#be123c', '#0e7490']
 const CLASE_INPUT =
   'rounded-lg border border-slate-300 px-3 py-2 font-normal focus:border-marca-600 focus:outline-none focus:ring-1 focus:ring-marca-600'
@@ -34,9 +37,12 @@ export default function NuevaFirmaAdmin() {
   const [archivo, setArchivo] = useState<File | null>(null)
   const [datosPdf, setDatosPdf] = useState<ArrayBuffer | null>(null)
   const [firmantes, setFirmantes] = useState<FirmanteForm[]>(() => [
-    nuevoFirmante('responsable'),
+    nuevoFirmante(ROL_ARRENDADOR),
     nuevoFirmante('estudiante'),
+    nuevoFirmante('responsable'),
   ])
+  const [huespedes, setHuespedes] = useState<HuespedVigente[]>([])
+  const [huespedId, setHuespedId] = useState('')
   const [campos, setCampos] = useState<CampoEditable[]>([])
   const [activoId, setActivoId] = useState<string | null>(null)
   const [dibujar, setDibujar] = useState(true)
@@ -50,6 +56,32 @@ export default function NuevaFirmaAdmin() {
     color: COLORES[i % COLORES.length],
   }))
   const idActivo = activoId ?? firmantes[0]?.id ?? null
+
+  // Huéspedes con estadía vigente (acuerdo activo), para vincular el contrato firmado.
+  useEffect(() => {
+    cargarHuespedesVigentes().then(setHuespedes)
+  }, [])
+
+  function elegirHuesped(id: string) {
+    setHuespedId(id)
+    const huesped = huespedes.find((h) => h.id === id)
+    if (!huesped) return
+    setHabitacion(huesped.numero_habitacion)
+    setTitulo((actual) => actual || `Acuerdo de arrendamiento Habitación ${huesped.numero_habitacion}`)
+    // Rellena (sin pisar lo ya escrito) al firmante estudiante con los datos del huésped.
+    setFirmantes((lista) => {
+      const indice = lista.findIndex((f) => f.rol === 'estudiante')
+      if (indice === -1) return lista
+      const estudiante = lista[indice]
+      const actualizado = {
+        ...estudiante,
+        nombre: estudiante.nombre || huesped.nombres,
+        correo: estudiante.correo || huesped.correo,
+        telefono: estudiante.telefono || huesped.numero_whatsapp || '',
+      }
+      return lista.map((f, i) => (i === indice ? actualizado : f))
+    })
+  }
 
   async function alElegirArchivo(evento: ChangeEvent<HTMLInputElement>) {
     const elegido = evento.target.files?.[0]
@@ -120,6 +152,7 @@ export default function NuevaFirmaAdmin() {
       id: contratoId,
       titulo: titulo.trim(),
       habitacion: habitacion || null,
+      huesped_id: huespedId || null,
       ruta_original: rutaOriginal,
       creado_por: user.id,
     })
@@ -177,6 +210,13 @@ export default function NuevaFirmaAdmin() {
         <p className="mt-1 text-sm text-slate-600">
           Envía a cada firmante su propio enlace. Cada enlace solo sirve para su firma.
         </p>
+        {creado.firmantes.some((f) => f.rol === ROL_ARRENDADOR) && (
+          <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+            La firma del arrendador se carga desde <strong>Firmas</strong> con el botón &quot;Cargar firma
+            (imagen)&quot;. Cuando estén todas las firmas, el contrato se vincula al huésped y se envía la
+            copia por correo.
+          </p>
+        )}
         <div className="mt-4 flex flex-col gap-3">
           {creado.firmantes.map((f) => (
             <div key={f.id} className="rounded-lg border border-slate-200 bg-white p-4">
@@ -212,6 +252,21 @@ export default function NuevaFirmaAdmin() {
             placeholder="Acuerdo de arrendamiento Habitación 105"
             className={CLASE_INPUT}
           />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 sm:col-span-2">
+          Huésped existente (opcional)
+          <select value={huespedId} onChange={(e) => elegirHuesped(e.target.value)} className={CLASE_INPUT}>
+            <option value="">Ninguno / aún no existe</option>
+            {huespedes.map((h) => (
+              <option key={h.id} value={h.id}>
+                H{h.numero_habitacion} — {h.nombres}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs font-normal text-slate-500">
+            Si lo eliges, al completarse las firmas el contrato queda en su sección de Contratos (el mismo
+            archivo, sin copias) y se envía la copia por correo. Rellena la habitación y los datos del estudiante.
+          </span>
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
           Habitación (opcional)
@@ -260,8 +315,11 @@ export default function NuevaFirmaAdmin() {
                   onChange={(e) => actualizarFirmante(f.id, { rol: e.target.value })}
                   className={CLASE_INPUT}
                 >
-                  <option value="responsable">Responsable</option>
-                  <option value="estudiante">Estudiante</option>
+                  {ROLES_FIRMANTE.map((rol) => (
+                    <option key={rol.valor} value={rol.valor}>
+                      {rol.etiqueta}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">

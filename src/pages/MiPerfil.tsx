@@ -26,10 +26,10 @@ export default function MiPerfil() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [huesped?.id])
 
-  async function verContrato(archivoUrl: string) {
+  async function verContrato(contrato: Contrato) {
     const { data, error: errorFirma } = await getSupabase()
-      .storage.from('contratos')
-      .createSignedUrl(archivoUrl, 60)
+      .storage.from(contrato.bucket)
+      .createSignedUrl(contrato.archivo_url, 60)
     if (errorFirma || !data) {
       setError('No se pudo abrir el contrato.')
       return
@@ -205,7 +205,7 @@ export default function MiPerfil() {
               </div>
               <button
                 type="button"
-                onClick={() => verContrato(contrato.archivo_url)}
+                onClick={() => verContrato(contrato)}
                 className="text-sm text-marca-700 underline"
               >
                 Ver contrato

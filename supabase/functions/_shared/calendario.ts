@@ -32,6 +32,13 @@ export function fechaFinAcuerdo(fechaIngreso: string, mesesAcuerdo: number): Dat
   return sumarMeses(new Date(`${fechaIngreso}T00:00:00`), mesesAcuerdo)
 }
 
+/** Último día del acuerdo: un día antes de cumplirse los meses (21 sep + 8 meses → 20 may). */
+export function ultimoDiaAcuerdo(fechaIngreso: string, mesesAcuerdo: number): Date {
+  const fin = fechaFinAcuerdo(fechaIngreso, mesesAcuerdo)
+  fin.setDate(fin.getDate() - 1)
+  return fin
+}
+
 export function mismaFecha(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&

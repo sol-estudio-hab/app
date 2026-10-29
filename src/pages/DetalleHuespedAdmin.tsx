@@ -13,6 +13,7 @@ import {
   formatearMes,
   generarMesesAcuerdo,
 } from '../lib/calendario'
+import { invocarFuncion } from '../lib/funciones'
 import { getSupabase } from '../lib/supabase'
 import type { Acuerdo, Contrato, Deposito, Huesped, Pago } from '../types/dominio'
 
@@ -53,6 +54,8 @@ export default function DetalleHuespedAdmin() {
   const [motivoRechazoDeposito, setMotivoRechazoDeposito] = useState('')
 
   const [archivando, setArchivando] = useState(false)
+  const [enviandoCopia, setEnviandoCopia] = useState<string | null>(null)
+  const [mensajeCopia, setMensajeCopia] = useState<string | null>(null)
   const [procesandoMes, setProcesandoMes] = useState<string | null>(null)
   const [procesandoCargue, setProcesandoCargue] = useState<1 | 2 | null>(null)
   const [moviendoMes, setMoviendoMes] = useState<string | null>(null)
@@ -329,15 +332,33 @@ export default function DetalleHuespedAdmin() {
     window.open(data.signedUrl, '_blank', 'noopener')
   }
 
-  async function verContrato(archivoUrl: string) {
+  async function verContrato(contrato: Contrato) {
     const { data, error: errorFirma } = await getSupabase()
-      .storage.from('contratos')
-      .createSignedUrl(archivoUrl, 60)
+      .storage.from(contrato.bucket)
+      .createSignedUrl(contrato.archivo_url, 60)
     if (errorFirma || !data) {
       setError('No se pudo abrir el contrato.')
       return
     }
     window.open(data.signedUrl, '_blank', 'noopener')
+  }
+
+  // Envía (o reenvía) la copia del acuerdo firmado digitalmente a firmantes, huésped y administradores.
+  async function enviarCopiaFirmada(contrato: Contrato) {
+    if (!contrato.firma_contrato_id) return
+    setError(null)
+    setMensajeCopia(null)
+    setEnviandoCopia(contrato.id)
+    const { datos, error: errorCopia } = await invocarFuncion<{ envio: { destinatarios?: string[] } }>(
+      'firma-copia',
+      { contratoId: contrato.firma_contrato_id, forzar: true },
+    )
+    setEnviandoCopia(null)
+    if (errorCopia) {
+      setError(errorCopia)
+      return
+    }
+    setMensajeCopia(`Copia enviada a: ${datos?.envio.destinatarios?.join(', ')}.`)
   }
 
   async function subirContrato(archivo: File) {
@@ -858,6 +879,8 @@ export default function DetalleHuespedAdmin() {
           tu correo de administrador.
         </p>
 
+        {mensajeCopia && <p className="mt-2 text-xs text-green-700">{mensajeCopia}</p>}
+
         {contratos.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">Sin contratos cargados todavía.</p>
         ) : (
@@ -872,7 +895,11 @@ export default function DetalleHuespedAdmin() {
                   <p className="text-xs text-slate-500">
                     Cargado el {new Date(contrato.creado_en).toLocaleDateString('es')}
                   </p>
-                  {contrato.confirmado_leido ? (
+                  {contrato.firma_contrato_id ? (
+                    <p className="text-xs font-medium text-emerald-600">
+                      Firmado digitalmente por todas las partes (viene del módulo de Firmas)
+                    </p>
+                  ) : contrato.confirmado_leido ? (
                     <p className="text-xs font-medium text-emerald-600">
                       Confirmado por el huésped el{' '}
                       {contrato.confirmado_en && new Date(contrato.confirmado_en).toLocaleDateString('es')}
@@ -881,13 +908,25 @@ export default function DetalleHuespedAdmin() {
                     <p className="text-xs text-amber-600">Aún no confirmado por el huésped</p>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => verContrato(contrato.archivo_url)}
-                  className="text-sm text-marca-700 underline"
-                >
-                  Ver contrato
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  {contrato.firma_contrato_id && (
+                    <button
+                      type="button"
+                      onClick={() => enviarCopiaFirmada(contrato)}
+                      disabled={enviandoCopia === contrato.id}
+                      className="rounded-lg border border-marca-700 px-3 py-1 text-sm font-semibold text-marca-700 hover:bg-marca-50 disabled:opacity-60"
+                    >
+                      {enviandoCopia === contrato.id ? 'Enviando…' : 'Enviar copia por correo'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => verContrato(contrato)}
+                    className="text-sm text-marca-700 underline"
+                  >
+                    Ver contrato
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

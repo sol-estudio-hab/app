@@ -164,21 +164,45 @@ pasa por dos Edge Functions públicas con el token (UUID impredecible, uno por f
 en el servidor** con `pdf-lib` sobre las casillas guardadas, así que no se puede subir un PDF alterado;
 si dos firmantes envían a la vez, un control de versión evita que se pisen). Se guarda la IP y la fecha.
 
+### Firma del arrendador, vínculo con el huésped y copia por correo
+
+- **Arrendador (propietario):** es un rol más de firmante. Su firma se carga desde **Firmas → "Cargar
+  firma (imagen)"**: el admin sube una foto o escaneo de la firma (se le quita el fondo, aunque tenga
+  sombras, y se recorta) y se estampa en **el mismo recuadro** que se dibujó para el arrendador. La
+  última firma usada se recuerda en el navegador para no subirla en cada contrato. Lo hace la función
+  `firma-admin` (solo administradores).
+- **Vínculo con el huésped (sin copias):** al crear el contrato se puede elegir un huésped existente;
+  si no, al completarse las firmas se busca el huésped con estadía vigente en esa habitación (solo si el
+  correo del estudiante coincide, para no vincular a otra persona). Cuando están **todas** las firmas, el
+  contrato aparece en la sección **Contratos** del huésped (admin y "Mi perfil") apuntando al **mismo PDF**
+  (fila de `contratos` con `bucket = 'firmas'` y `firma_contrato_id`); no se duplica el archivo. En la lista
+  de Firmas se puede vincular a mano a un huésped.
+- **Copia por correo:** al completarse, si el huésped ya tiene su estadía (acuerdo activo) en el sistema, se
+  envía solo a los correos de los firmantes + el huésped + los administradores. Asunto:
+  `Acuerdo Firmado Leonel H105 21 Sep 26 - 20 May 27` (primer nombre del **estudiante en Firmas**, habitación
+  del contrato, inicio y fin del acuerdo). **Si todavía no existe la estadía, no se envía** y queda pendiente:
+  el admin la envía con **"Enviar copia por correo"** desde Firmas o desde el detalle del huésped (sección
+  Contratos) — `firma-copia`. Se puede reenviar.
+
 ### Puesta en marcha
 
-1. Migración `0018_firmas.sql` (tablas `firma_contratos`, `firma_firmantes`, `firma_campos` y bucket
-   privado `firmas`):
+1. Migraciones `0018_firmas.sql` (tablas `firma_contratos`, `firma_firmantes`, `firma_campos` y bucket
+   privado `firmas`) y `0019_firmas_vinculo_huesped.sql` (vínculo con el huésped y envío de la copia):
 
    ```bash
    npx supabase@latest db query --file supabase/migrations/0018_firmas.sql --linked
+   npx supabase@latest db query --file supabase/migrations/0019_firmas_vinculo_huesped.sql --linked
    ```
 
-2. Desplegar las dos funciones **sin** verificación de JWT (el firmante no tiene sesión; el token es la
-   credencial). No necesitan secrets nuevos:
+2. Desplegar las funciones. Las del firmante van **sin** verificación de JWT (no tiene sesión; el token es la
+   credencial); las del admin **con** JWT (valor por defecto). No necesitan secrets nuevos:
 
    ```bash
    supabase functions deploy firma-sesion --no-verify-jwt
    supabase functions deploy firma-enviar --no-verify-jwt
+   supabase functions deploy firma-admin
+   supabase functions deploy firma-copia
+   supabase functions deploy notificar-contrato-huesped
    ```
 
 3. Dominio `firmas.solestudiohab.com` (opcional pero recomendado): en Cloudflare → Workers & Pages →

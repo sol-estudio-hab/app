@@ -24,6 +24,7 @@ interface PayloadWebhook {
     huesped_id: string
     archivo_url: string
     nombre_archivo: string
+    firma_contrato_id?: string | null
   }
 }
 
@@ -38,6 +39,12 @@ Deno.serve(async (req) => {
     const payload = (await req.json()) as PayloadWebhook
     if (payload.table !== 'contratos' || payload.type !== 'INSERT') {
       return new Response(JSON.stringify({ omitido: true }), { status: 200 })
+    }
+
+    // Un contrato firmado digitalmente (vinculado desde Firmas) tiene su propio correo con la
+    // copia firmada; aquí no se manda el aviso de "contrato nuevo" ni el reglamento.
+    if (payload.record.firma_contrato_id) {
+      return new Response(JSON.stringify({ omitido: 'contrato firmado digitalmente' }), { status: 200 })
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
