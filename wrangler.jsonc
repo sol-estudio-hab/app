@@ -1,0 +1,13 @@
+{
+  // Despliegue en Cloudflare (Workers Builds → `npx wrangler deploy`): publica la carpeta
+  // `dist` que genera `npm run build`. Sin este archivo, wrangler intenta autoconfigurar el
+  // proyecto e instalar paquetes, y el despliegue falla.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "app",
+  "compatibility_date": "2026-10-23",
+  "assets": {
+    "directory": "./dist",
+    // Rutas de React Router (/admin, /firmar…): al recargar sirven index.html.
+    "not_found_handling": "single-page-application"
+  }
+}
