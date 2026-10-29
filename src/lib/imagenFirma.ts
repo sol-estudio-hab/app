@@ -16,6 +16,8 @@ export function alfaDesdeContraste(diferencia: number): number {
   return Math.round((255 * (diferencia - DIFERENCIA_FONDO)) / (DIFERENCIA_TINTA - DIFERENCIA_FONDO))
 }
 
+/** Debe ser menor que el límite de firma-enviar / firma-admin (900.000 caracteres). */
+const LIMITE_DATA_URL = 800_000
 const ANCHO_TRABAJO = 1000
 const ANCHO_SALIDA = 800
 const MARGEN = 6
@@ -96,9 +98,17 @@ export async function procesarImagenFirma(archivo: File): Promise<string> {
   const h = Math.min(alto, maxY + MARGEN) - y0
   const reduccion = Math.min(1, ANCHO_SALIDA / w)
 
-  const salida = document.createElement('canvas')
-  salida.width = Math.max(1, Math.round(w * reduccion))
-  salida.height = Math.max(1, Math.round(h * reduccion))
-  salida.getContext('2d')?.drawImage(lienzo, x0, y0, w, h, 0, 0, salida.width, salida.height)
-  return salida.toDataURL('image/png')
+  // El servidor rechaza firmas de más de ~900 KB: si el PNG sale pesado, se reduce hasta que quepa.
+  let factor = reduccion
+  let resultado = ''
+  for (let intento = 0; intento < 6; intento++) {
+    const salida = document.createElement('canvas')
+    salida.width = Math.max(1, Math.round(w * factor))
+    salida.height = Math.max(1, Math.round(h * factor))
+    salida.getContext('2d')?.drawImage(lienzo, x0, y0, w, h, 0, 0, salida.width, salida.height)
+    resultado = salida.toDataURL('image/png')
+    if (resultado.length <= LIMITE_DATA_URL) break
+    factor *= 0.75
+  }
+  return resultado
 }

@@ -154,8 +154,10 @@ El PDF final acumula las firmas (el segundo firmante parte del PDF ya firmado po
   faltan, descarga del PDF firmado (o con las firmas hasta ahora), y eliminar.
 
 **Firmante** (`/firmar?t=…`, sin cuenta): ve el título, su nombre y rol y el PDF con sus casillas en
-dorado; toca "Firmar", dibuja la firma (Borrar / Cancelar / Aplicar), acepta "He leído el acuerdo y
-acepto firmarlo" y envía. Si el enlace ya se usó dice "Este documento ya fue firmado" y ofrece su copia.
+dorado; toca "Firmar" y elige cómo dar su firma: **Dibujar** (con el dedo o el mouse) o **Subir imagen**
+(foto o escaneo de su firma; se le quita el fondo y las sombras para que quede como una firma dibujada).
+Luego Aplicar, acepta "He leído el acuerdo y acepto firmarlo" y envía. Las dos opciones están disponibles
+para todos los firmantes. Si el enlace ya se usó dice "Este documento ya fue firmado" y ofrece su copia.
 
 **Seguridad**: el navegador del firmante nunca toca las tablas ni el bucket (RLS solo para admin). Todo
 pasa por dos Edge Functions públicas con el token (UUID impredecible, uno por firmante):
@@ -166,11 +168,11 @@ si dos firmantes envían a la vez, un control de versión evita que se pisen). S
 
 ### Firma del arrendador, vínculo con el huésped y copia por correo
 
-- **Arrendador (propietario):** es un rol más de firmante. Su firma se carga desde **Firmas → "Cargar
-  firma (imagen)"**: el admin sube una foto o escaneo de la firma (se le quita el fondo, aunque tenga
-  sombras, y se recorta) y se estampa en **el mismo recuadro** que se dibujó para el arrendador. La
-  última firma usada se recuerda en el navegador para no subirla en cada contrato. Lo hace la función
-  `firma-admin` (solo administradores).
+- **Arrendador (propietario):** es un rol más de firmante: puede firmar con su enlace igual que los demás
+  (dibujando o subiendo imagen) o el admin puede cargar su firma desde **Firmas → "Cargar firma
+  (imagen)"** (dibujada o subida), que se estampa en **el mismo recuadro** que se dibujó para el
+  arrendador. En ese panel del admin la última firma usada se recuerda en el navegador para no repetirla
+  en cada contrato. Lo hace la función `firma-admin` (solo administradores).
 - **Vínculo con el huésped (sin copias):** al crear el contrato se puede elegir un huésped existente;
   si no, al completarse las firmas se busca el huésped con estadía vigente en esa habitación (solo si el
   correo del estudiante coincide, para no vincular a otra persona). Cuando están **todas** las firmas, el

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import EnlaceFirmante from '../components/firmas/EnlaceFirmante'
-import ModalFirmaImagen from '../components/firmas/ModalFirmaImagen'
+import PanelFirma from '../components/firmas/PanelFirma'
 import {
   ETIQUETA_ESTADO_FIRMA,
   type FirmaContrato,
@@ -330,8 +330,10 @@ export default function FirmasAdmin() {
       </div>
 
       {modal && (
-        <ModalFirmaImagen
-          nombre={modal.nombre}
+        <PanelFirma
+          titulo={`Firma de ${modal.nombre}`}
+          descripcion="Se estampará en su recuadro del PDF. Puedes dibujarla o subir una imagen (foto o escaneo)."
+          recordarClave="sol-firma-arrendador"
           guardando={ocupado === 'firma'}
           error={errorModal}
           onAplicar={firmarArrendador}
